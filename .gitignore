@@ -135,4 +135,3 @@ dmypy.json
 # Added ignores // Kent
 *.keras
 /logs
-clipboard.txt
