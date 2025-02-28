@@ -5,13 +5,13 @@ import os
 from tqdm import tqdm
 
 # Paths
-path_record_train = "RECORDS_TRAIN.txt"  # Path to the record list
-path_record_test = "RECORDS_TEST.txt"
-path_record_valid = "RECORDS_VALID.txt"
+path_record_train = "data/PTB_XL_data/RECORDS_TRAIN.txt"  # Path to the record list
+path_record_test = "data/PTB_XL_data/RECORDS_TEST.txt"
+path_record_valid = "data/PTB_XL_data/RECORDS_VALID.txt"
 
-path_hdf5_train = "signals_train.hdf5"
-path_hdf5_valid = "signals_valid.hdf5"
-path_hdf5_test = "signals_test.hdf5"
+path_hdf5_train = "data/PTB_XL_data/signals_train.hdf5"
+path_hdf5_valid = "data/PTB_XL_data/signals_valid.hdf5"
+path_hdf5_test = "data/PTB_XL_data/signals_test.hdf5"
 
 
 def CreateHDF5(recordsPath, outputPath):
