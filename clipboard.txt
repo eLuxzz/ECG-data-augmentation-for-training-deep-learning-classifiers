@@ -1,0 +1,1 @@
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
