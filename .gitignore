@@ -133,6 +133,6 @@ dmypy.json
 *.hdf5
 
 # Added ignores // Kent
+*.keras
 /logs
 clipboard.txt
-*.keras
