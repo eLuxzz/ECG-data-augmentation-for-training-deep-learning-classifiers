@@ -8,6 +8,9 @@ import numpy as np
 class ECGSequence(Sequence):
     @classmethod
     def get_train_and_val(cls, path_to_hdf5, hdf5_dset, path_to_csv, batch_size=8, val_split=0.02):
+        # Use samples = 100 and valid_seq setting end_idx to samples for testing if the model is running.
+        # n_samples = 100
+        # valid_seq = cls(path_to_hdf5, hdf5_dset, path_to_csv, batch_size, start_idx=n_train, end_idx=n_samples)
         n_samples = len(pd.read_csv(path_to_csv))
         n_train = math.ceil(n_samples*(1-val_split))
         train_seq = cls(path_to_hdf5, hdf5_dset, path_to_csv, batch_size, end_idx=n_train)

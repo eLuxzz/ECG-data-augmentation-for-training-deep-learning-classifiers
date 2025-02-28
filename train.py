@@ -22,7 +22,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # Optimization settings
     loss = 'binary_crossentropy'
-    lr = 0.001
+    lr = 0.01
     batch_size = 64
     opt = Adam(lr)
     callbacks = [ReduceLROnPlateau(monitor='val_loss',
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     model.compile(loss=loss, optimizer=opt)
     # Create log
 
-    log_dir = os.path.abspath("C:/Users/amjad/Documents/logs")  # Välj en enkel sökväg
+    log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
     os.makedirs(log_dir, exist_ok=True)
 
     callbacks += [TensorBoard(log_dir=log_dir, write_graph=False)]
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                   ModelCheckpoint('./backup_model_best.keras', save_best_only=True)]
     # Train neural network
     history = model.fit(train_seq,
-                        epochs=70,
+                        epochs=40,
                         initial_epoch=0,  # If you are continuing a interrupted section change here
                         callbacks=callbacks,
                         validation_data=valid_seq,

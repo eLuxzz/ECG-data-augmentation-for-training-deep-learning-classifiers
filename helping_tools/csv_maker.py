@@ -17,7 +17,7 @@ MI = {"AMI", "IMI", "LMI", "PMI"}
 
 STTC = {"ISCA", "ISCI", "ISC_", "STTC", "NST_"}
 
-SUPER_CLASSES = ["ecg_id", "NORM", "CD", "HYP", "MI", "STTC"]
+SUPER_CLASSES = ["NORM", "CD", "HYP", "MI", "STTC"]
 
 
 df['scp_codes'] = df['scp_codes'].apply(ast.literal_eval)
@@ -47,7 +47,8 @@ for i in df['scp_codes']:
     max_val(common_with_hyp, "HYP", data_dict)
     max_val(common_with_mi, "MI", data_dict)
     max_val(common_with_sttc, "STTC", data_dict)
-    data_dict["ecg_id"] = df["ecg_id"][line]
+    # Removed ecg_id temporarily from csv file.
+    # data_dict["ecg_id"] = df["ecg_id"][line]
     if df["strat_fold"][line] == 9:
         val_data.append(data_dict)
     elif  df["strat_fold"][line] == 10:

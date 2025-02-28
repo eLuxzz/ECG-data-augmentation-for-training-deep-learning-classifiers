@@ -132,5 +132,7 @@ dmypy.json
 # Avoid large files
 *.hdf5
 
-automatic-ecg-diagnosis-master/data
+# Added ignores // Kent
+/logs
 clipboard.txt
+*.keras
