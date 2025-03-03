@@ -1,1 +1,4 @@
 python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
+
+python test.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv
