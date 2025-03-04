@@ -21,10 +21,7 @@ plotter = DataPlotter(
     base_data, 
     augmented_data,
     same_graf=True,
-    sample_range=[1,2000],
-    leads=[1,2,3]
-    
-
+    sample_range=[1,5000],
 )
 
 plotter.plot()

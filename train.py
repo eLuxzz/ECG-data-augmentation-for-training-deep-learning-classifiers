@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # Load data and setup sequences
     slice = 200
     dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name)
-    trainSignalData, trainAnnotationData = dataloader.getBaseData_Sliced(slice)
+    trainSignalData, trainAnnotationData = dataloader.getAugmentedData_Sliced(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"], slice)
     validationSignalData, validationSignalAnnotations = dataloader.getValidationData_Sliced(slice)
 
     train_seq = ECGSequence(trainSignalData, trainAnnotationData, batch_size)
