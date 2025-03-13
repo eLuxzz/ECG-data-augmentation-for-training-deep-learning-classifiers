@@ -134,4 +134,6 @@ dmypy.json
 
 # Added ignores // Kent
 *.keras
+
 /logs
+/trained_models

@@ -52,10 +52,14 @@ class Dataloader():
                 - annotationData [any] : Annotation data
         """
         augmentedData, annotationData = self.getBaseTrainingData()
-        
+        print("Base-data loaded")
         for DAMethod in DAMethods:
             func = getattr(self._DA, DAMethod)
-            augmentedData = func(augmentedData)
+            if func:
+                print(f"Applying {DAMethod}")
+                augmentedData = func(augmentedData)
+                print(f"Done applying {DAMethod}")
+        print("DA Done")
         return augmentedData, annotationData
     #Helper functions that can be used for testing belows
     def getAugmentedData_Sliced(self, DAMethods, sliceIdx):
@@ -71,7 +75,8 @@ class Dataloader():
         augmentedData, annotationData = self.getBaseData_Sliced(sliceIdx)
         for DAMethod in DAMethods:
             func = getattr(self._DA, DAMethod)
-            augmentedData = func(augmentedData)
+            if func:
+                augmentedData = func(augmentedData)
         return augmentedData, annotationData
     def getBaseData_Sliced(self, sliceIdx):
         """Loads a sliced version of base data

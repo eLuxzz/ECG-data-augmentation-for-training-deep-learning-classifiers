@@ -2,6 +2,8 @@ import h5py
 import pandas as pd
 
 class Fileloader:
+    def __init__(self):
+        self.files = []
     """A dedicated class for loading in raw data from HDF5 and CSV files."""
     def getData(self, pathHDF5, setName, pathCSV = None):
         """Loads dataset, setName, from HDF5 file, and, if provided, csv data
@@ -26,8 +28,9 @@ class Fileloader:
         Returns:
             signals [float32]: An array containing all data signals
         """
-        self.file = h5py.File(pathHDF5, "r")
-        signals = self.file[setName]
+        file = (h5py.File(pathHDF5, "r"))
+        signals = file[setName]
+        self.files.append(file)
         return signals
 
     def __loadDataFromCSV(self,pathCSV):
@@ -43,4 +46,5 @@ class Fileloader:
             annotationData = pd.read_csv(pathCSV).values
         return annotationData
     def __del__(self):
-        self.file.close()    
+        for file in self.files:
+            file.close()    

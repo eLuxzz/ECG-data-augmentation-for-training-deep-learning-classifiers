@@ -5,7 +5,7 @@ warnings.filterwarnings("ignore")
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 from datasets import ECGSequence
-
+from fileloader import Fileloader
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Get performance on test set from hdf5')
@@ -25,12 +25,18 @@ if __name__ == '__main__':
         warnings.warn("Unknown arguments:" + str(unk) + ".")
 
     # Import data
-    seq = ECGSequence(args.path_to_hdf5, args.dataset_name, batch_size=args.bs)
+    fileloader = Fileloader()
+    signaldata, _ = fileloader.getData(args.path_to_hdf5, args.dataset_name)
+    seq = ECGSequence(signaldata, batch_size=args.bs)
+    
     # Import model
     model = load_model(args.path_to_model, compile=False)
     model.compile(loss='binary_crossentropy', optimizer=Adam())
     y_score = model.predict(seq,  verbose=1)
-
+    # # thresholds = 0.8
+    # # thresholds = np.array([0.7, 0.8, 0.8, 0.8,0.8])  # Custom threshold per class
+    # # y_binary = (y_score >= thresholds).astype(int)
+    # y_binary = (y_score >= 0.8).astype(int)
     # Generate dataframe
     np.save(args.output_file, y_score)
 

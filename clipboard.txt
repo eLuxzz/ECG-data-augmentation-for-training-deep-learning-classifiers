@@ -1,4 +1,13 @@
 python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
 
 python test.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name base_model
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name DA_model
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name test_model
+python dataplotter_tester.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
+
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/base_model.keras --output_file dnn_predicts/base_predict.npy
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/gaussian_model.keras --output_file dnn_predicts/gauss_predict.npy
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/baseline_model.keras --output_file dnn_predicts/baseline_predict.npy
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/powerline_model.keras --output_file dnn_predicts/powerline_predict.npy
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/baseline_powerline_gaussian_DA_model.keras --output_file dnn_predicts/baseline_powerline_gaussian_DA_predict.npy

@@ -20,7 +20,7 @@ augmented_data, _ = d.getAugmentedData_Sliced(["add_powerline_noise", "add_basel
 plotter = DataPlotter(
     base_data, 
     augmented_data,
-    same_graf=True,
+    same_graf=False,
     sample_range=[1,5000],
 )
 
