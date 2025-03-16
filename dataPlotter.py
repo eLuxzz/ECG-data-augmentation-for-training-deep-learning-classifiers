@@ -15,6 +15,9 @@ class DataPlotter:
         """
         self.base_data = np.squeeze(base_data)[sample_range[0]:sample_range[1]]
         self.augmented_data = np.squeeze(augmented_data)[sample_range[0]:sample_range[1]]
+        self.base_data = np.squeeze(base_data)[sample_range[0]:sample_range[1]]
+        self.augmented_data = np.squeeze(augmented_data)[sample_range[0]:sample_range[1]]
+        
         self.leads = leads
         self.sample_range = sample_range
         self.filtered_base, self.filtered_augmented, self.time = self._filter_data()

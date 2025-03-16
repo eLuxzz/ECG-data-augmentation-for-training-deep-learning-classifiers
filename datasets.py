@@ -1,9 +1,9 @@
 import math
-from tensorflow.keras.utils import Sequence
+from tensorflow.keras.utils import PyDataset
 import numpy as np
 
 
-class ECGSequence(Sequence):
+class ECGSequence(PyDataset):
     def __init__(self, signalData, annotations = None, batch_size=8):
         self.x = signalData
         self.y = annotations

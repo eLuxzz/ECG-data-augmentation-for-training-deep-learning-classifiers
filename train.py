@@ -1,11 +1,23 @@
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import (ModelCheckpoint, TensorBoard, ReduceLROnPlateau,
                                         EarlyStopping)
+from tensorflow.keras import mixed_precision
+from tensorflow import keras
+import tensorflow as tf
+import tensorflow.keras.backend as K
 import argparse
 import os
 from model import get_model
 from datasets import ECGSequence
 from dataloader import Dataloader
+from fileloader import Fileloader
+import numpy as np
+import logging
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+mixed_precision.set_global_policy('mixed_float16')
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train neural network.')
@@ -28,7 +40,7 @@ if __name__ == "__main__":
     # Optimization settings
     loss = 'binary_crossentropy'
     lr = 0.001
-    batch_size = 64
+    batch_size = 32
     opt = Adam(lr)
     callbacks = [ReduceLROnPlateau(monitor='val_loss',
                                    factor=0.1,
@@ -38,36 +50,47 @@ if __name__ == "__main__":
                                min_delta=0.00001)]
     # Load data and setup sequences
     slice = 200
-    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name)
-    # trainSignalData, trainAnnotationData = dataloader.getAugmentedData_Sliced(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"], slice)
-    # validationSignalData, validationSignalAnnotations = dataloader.getValidationData_Sliced(slice)
-    trainSignalData, trainAnnotationData = dataloader.getBaseTrainingData()
-    # trainSignalData, trainAnnotationData = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"])
-    # trainSignalData, trainAnnotationData = dataloader.getAugmentedData(["add_gaussian_noise"])
-    validationSignalData, validationSignalAnnotations = dataloader.getValidationData()
-
+    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name, batch_size)
+    fileloader = Fileloader()
+    trainSignalData, trainAnnotationData = fileloader.getData(args.path_train_hdf5,"tracings", args.path_train_csv)
     train_seq = ECGSequence(trainSignalData, trainAnnotationData, batch_size)
-    valid_seq = ECGSequence(validationSignalData, validationSignalAnnotations, batch_size)
+
+    # tf_dataset = dataloader.getBaseData()
+    tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"])
+    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander"])
+    valid_seq = dataloader.getValidationData()
+    tf_dataset = tf_dataset.cache()
+    buffer_size= 10000
+    tf_dataset = tf_dataset.shuffle(buffer_size=buffer_size).prefetch(tf.data.AUTOTUNE)
 
     # If you are continuing an interrupted section, uncomment line bellow:
-    #   model = keras.models.load_model(PATH_TO_PREV_MODEL, compile=False)
+    # PATH_TO_PREV_MODEL = "backup_model_last.keras"
+    # model = tf.keras.models.load_model(PATH_TO_PREV_MODEL, compile=False)
+
     model = get_model(train_seq.n_classes)
     model.compile(loss=loss, optimizer=opt)
     # Create log
 
     log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
     os.makedirs(log_dir, exist_ok=True)
+    # tf.keras.backend.clear_session()
+    # tf.profiler.experimental.start(log_dir)
 
-    callbacks += [TensorBoard(log_dir=log_dir, write_graph=False)]
+    # tensorflow.debugging.experimental.enable_dump_debug_info(log_dir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
+    callbacks += [TensorBoard(log_dir=log_dir, histogram_freq=1, write_graph=True)]
         # Save the BEST and LAST model
     callbacks += [ModelCheckpoint('./backup_model_last.keras'),
                   ModelCheckpoint('./backup_model_best.keras', save_best_only=True)]
     # Train neural network
-    history = model.fit(train_seq,
-                        epochs=40,
+    # tf.profiler.experimental.stop()
+    print("Start training")
+    history = model.fit(tf_dataset,
+                        epochs=60,
                         initial_epoch=0,  # If you are continuing a interrupted section change here
                         callbacks=callbacks,
                         validation_data=valid_seq,
                         verbose=1)
     # Save final result
     model.save(f"./{args.final_model_name}.keras")
+    K.clear_session()
+    # tf.profiler.experimental.stop()

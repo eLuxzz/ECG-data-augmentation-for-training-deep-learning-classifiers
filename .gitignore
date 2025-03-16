@@ -136,4 +136,5 @@ dmypy.json
 *.keras
 
 /logs
-/trained_models
+#/trained_models
+/outputs_old

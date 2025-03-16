@@ -1,0 +1,13 @@
+predictor,,DNN,DNN
+predicted label,,not present,present
+diagnosis,true label,,
+NORM,not present,823,412
+NORM,present,17,946
+CD,not present,1600,227
+CD,present,23,348
+HYP,not present,1801,183
+HYP,present,37,177
+MI,not present,1901,80
+MI,present,100,117
+STTC,not present,1968,50
+STTC,present,92,88
