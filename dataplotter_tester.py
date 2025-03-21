@@ -14,7 +14,9 @@ args = parser.parse_args()
 d = Dataloader(args.path_train_hdf5, args.path_train_csv,None,None)
 
 base_dataset = d.getBaseData(1)
-augmented_dataset = d.getAugmentedData(["add_baseline_wander"],1)
+# augmented_dataset = d.getAugmentedData(["add_baseline_wander"],1)
+# augmented_dataset = d.getAugmentedData(["add_gaussian_noise"],1)
+augmented_dataset = d.getAugmentedData(["add_powerline_noise"],1)
 
 (b_sample) = base_dataset.take(1)
 (a_sample) = augmented_dataset.take(1)
