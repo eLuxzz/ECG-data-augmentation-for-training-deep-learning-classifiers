@@ -115,7 +115,7 @@ class ResidualUnit(object):
         return [x, y]
 
 
-def get_model(n_classes, last_layer='sigmoid', l2_lambda =0.001):
+def get_model(n_classes, dropout_keep_prob = 0.7, last_layer='sigmoid', l2_lambda =0.001):
     kernel_size = 16
     kernel_initializer = 'he_normal'
     signal = Input(shape=(5000, 12), dtype=np.float16, name='signal')
@@ -125,7 +125,7 @@ def get_model(n_classes, last_layer='sigmoid', l2_lambda =0.001):
                kernel_regularizer=l2(l2_lambda/10))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
-    droupout_keep_prob = 0.7
+    droupout_keep_prob = dropout_keep_prob
     x, y = ResidualUnit(1024, 128, kernel_size=kernel_size,dropout_keep_prob=droupout_keep_prob,
                         kernel_initializer=kernel_initializer)([x, x])
     x, y = ResidualUnit(256, 196, kernel_size=kernel_size,dropout_keep_prob=droupout_keep_prob,
