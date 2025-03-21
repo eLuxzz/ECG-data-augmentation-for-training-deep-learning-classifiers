@@ -3,15 +3,18 @@ from tensorflow.keras.callbacks import (ModelCheckpoint, TensorBoard, ReduceLROn
                                         EarlyStopping)
 from tensorflow.keras import mixed_precision
 from tensorflow import keras
+
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import argparse
 import os
+import logging
+import time
+
 from model import get_model
 from datasets import ECGSequence
 from dataloader import Dataloader
 from fileloader import Fileloader
-import logging
 
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 mixed_precision.set_global_policy('mixed_float16')
@@ -45,6 +48,7 @@ if __name__ == "__main__":
     slice = None
     buffer_size= 10000
     num_epochs = 40
+    dropout_keep_prob = 0.7
     fileloader = Fileloader()
 
     trainSignalData, trainAnnotationData = fileloader.getData(args.path_train_hdf5,"tracings", args.path_train_csv)
@@ -54,20 +58,21 @@ if __name__ == "__main__":
                             args.validation_dataset_name, batch_size, buffer_size=buffer_size,epochs=num_epochs)
     # tf_dataset = dataloader.getBaseData(sliceIdx=slice)
     valid_seq = dataloader.getValidationData(sliceIdx=slice)
-    tf_dataset = dataloader.getAugmentedData(["add_powerline_noise"], sliceIdx=slice)
-    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"],sliceIdx=slice)    
+    # tf_dataset = dataloader.getAugmentedData(["add_powerline_noise"], sliceIdx=slice)
+    tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"],sliceIdx=slice)    
 
     # If you are continuing an interrupted section, uncomment line bellow:
     # PATH_TO_PREV_MODEL = "backup_model_last.keras"
     # model = tf.keras.models.load_model(PATH_TO_PREV_MODEL, compile=False)
     loss = 'binary_crossentropy'
     opt = Adam(lr)
-    model = get_model(train_seq.n_classes)
+    model = get_model(train_seq.n_classes, dropout_keep_prob=dropout_keep_prob)
     model.compile(loss=loss, optimizer=opt)
 
     # Create log
     log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
     os.makedirs(log_dir, exist_ok=True)
+    log_dir = os.path.join(log_dir, f"{args.final_model_name}-BS{batch_size}-LR{lr}-{time.strftime("%Y%m%d-%H%M%S")}")
     # tf.keras.backend.clear_session()
     # tf.profiler.experimental.start(log_dir)
     # tensorflow.debugging.experimental.enable_dump_debug_info(log_dir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
@@ -99,6 +104,6 @@ if __name__ == "__main__":
                             steps_per_epoch=steps_per_epoch)
     # Save final result
     training_no_sequence()
-    model.save(f"./{args.final_model_name}.keras")
+    model.save(f"./{args.final_model_name}-BS{batch_size}-LR{lr}-DR{dropout_keep_prob}-{time.strftime("%Y%m%d-%H%M%S")}.keras")
     K.clear_session()
     # tf.profiler.experimental.stop()
