@@ -24,7 +24,7 @@ def main():
     
     d = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name)
 
-    trainData, validData = d.getAugmentedData(["Augment", "Augment1"])
-    # trainData, validData = d.getValidationData_Sliced(100)
+    # dataset = d.getAugmentedData(["Augment", "Augment1"])
+    # dataset = d.getValidationData(100)
 if __name__ == "__main__":    
     main()
