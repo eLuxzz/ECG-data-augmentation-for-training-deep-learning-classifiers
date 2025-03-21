@@ -1,5 +1,3 @@
-from dataloader import Dataloader
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
