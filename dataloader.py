@@ -5,7 +5,7 @@ import tensorflow as tf
 class Dataloader():
     def __init__(self, pathHDF5_training, pathCSV_training, pathHDF5_valid, pathCSV_valid, 
                  setNameTraining = "tracings", setNameValid="tracings",
-                 batch_size=32, buffer_size=10000, epochs = 20):
+                 batch_size=32, buffer_size=10000, epochs = 20, DA_Prob = 0.4):
         """Set up dataloader with pathing, and instantiate needed help classes
         Args:
             pathHDF5_training (str): Path to HDF5 file containing training data
@@ -25,6 +25,7 @@ class Dataloader():
         self.batch_size = batch_size
         self.buffer_size = buffer_size
         self.epochs = epochs
+        self.DA_Prob = DA_Prob
         self.testcounter = 0
         self._DA = DataAugmenter()
         self._Fileloader = Fileloader()
@@ -80,7 +81,7 @@ class Dataloader():
         def apply_augmentation(x, y):
             for aug in DAMethods:
                 func = getattr(self._DA, aug)
-                if func and tf.random.uniform(()) > 0:  # Randomly apply augmentations
+                if func and tf.random.uniform(()) > self.DA_Prob:  # Randomly apply augmentations
                     x, y = func(x, y)
             return x, y
         dataset = dataset.shuffle(self.buffer_size,reshuffle_each_iteration=True) \
