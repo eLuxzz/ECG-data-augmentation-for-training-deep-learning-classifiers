@@ -61,7 +61,7 @@ class DataAugmenter:
         
     #     augmented_data = signalData + baseline_noise
     #     return augmented_data
-    def add_baseline_wander(self, signalData,label, frequency=0.5, amplitude=0.1, sampling_rate=500):
+    def add_baseline_wander(self, signalData, label, frequency=0.5, amplitude=0.1, sampling_rate=500):
         """
         Adds baseline wander noise to the ECG signal.
         

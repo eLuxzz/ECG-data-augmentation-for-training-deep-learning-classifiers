@@ -16,8 +16,8 @@ import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 mixed_precision.set_global_policy('mixed_float16')
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-physical_devices = tf.config.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+# physical_devices = tf.config.list_physical_devices('GPU')
+# tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train neural network.')
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     # Optimization settings
     loss = 'binary_crossentropy'
     lr = 0.001
-    batch_size = 32
+    batch_size = 8
     opt = Adam(lr)
     callbacks = [ReduceLROnPlateau(monitor='val_loss',
                                    factor=0.1,
@@ -49,19 +49,21 @@ if __name__ == "__main__":
                  EarlyStopping(patience=9,  # Patience should be larger than the one in ReduceLROnPlateau
                                min_delta=0.00001)]
     # Load data and setup sequences
-    slice = 200
-    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name, batch_size)
+    slice = 8
+    buffer_size=10
+    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name, batch_size, buffer_size=buffer_size)
     fileloader = Fileloader()
+
     trainSignalData, trainAnnotationData = fileloader.getData(args.path_train_hdf5,"tracings", args.path_train_csv)
     train_seq = ECGSequence(trainSignalData, trainAnnotationData, batch_size)
 
-    # tf_dataset = dataloader.getBaseData()
-    tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"])
-    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander"])
-    valid_seq = dataloader.getValidationData()
-    tf_dataset = tf_dataset.cache()
-    buffer_size= 10000
-    tf_dataset = tf_dataset.shuffle(buffer_size=buffer_size).prefetch(tf.data.AUTOTUNE)
+    # tf_dataset = dataloader.getBaseData(sliceIdx=slice)
+    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"])
+    tf_dataset = dataloader.getAugmentedData(["add_baseline_wander"], sliceIdx=slice)
+    valid_seq = dataloader.getValidationData(sliceIdx=slice)
+    print(tf_dataset)
+    # buffer_size= 10000
+    # tf_dataset = tf_dataset.shuffle(buffer_size=buffer_size).prefetch(tf.data.AUTOTUNE)
 
     # If you are continuing an interrupted section, uncomment line bellow:
     # PATH_TO_PREV_MODEL = "backup_model_last.keras"
@@ -84,13 +86,28 @@ if __name__ == "__main__":
     # Train neural network
     # tf.profiler.experimental.stop()
     print("Start training")
-    history = model.fit(tf_dataset,
-                        epochs=60,
-                        initial_epoch=0,  # If you are continuing a interrupted section change here
-                        callbacks=callbacks,
-                        validation_data=valid_seq,
-                        verbose=1)
+    steps_per_epoch = (slice) // batch_size
+    def training1():
+        num_epochs = 10
+        for epoch in range(num_epochs):
+            print(f"Epoch {epoch+1}/{num_epochs}")
+            
+            # Recreate the dataset to apply fresh DA each epoch
+            train_dataset = dataloader.getAugmentedData(["add_baseline_wander"], sliceIdx=slice)
+            # Train the model on the new dataset for this epoch
+            model.fit(train_dataset, epochs=1, steps_per_epoch=steps_per_epoch)
+    def training_org():
+        history = model.fit(tf_dataset,
+                            epochs=20,
+                            initial_epoch=0,  # If you are continuing a interrupted section change here
+                            callbacks=callbacks,
+                            validation_data=valid_seq,
+                            verbose=1,
+                            # steps_per_epoch=(len(trainSignalData)) // batch_size,
+                            steps_per_epoch=steps_per_epoch)
     # Save final result
+    training1()
+    # training_org()
     model.save(f"./{args.final_model_name}.keras")
     K.clear_session()
     # tf.profiler.experimental.stop()

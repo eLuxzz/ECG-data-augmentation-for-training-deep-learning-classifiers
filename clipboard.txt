@@ -14,7 +14,6 @@ python dataplotter_tester.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_dat
 
 
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_02/base_model.keras --output_file dnn_predicts/base_predict.npy
-
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_07_bs64.keras --output_file dnn_predicts/base_predict_07_bs64.npy
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_L2.keras --output_file dnn_predicts/base_predict_L2_07.npy
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_07_bs32.keras --output_file dnn_predicts/base_predict_07_bs32.npy

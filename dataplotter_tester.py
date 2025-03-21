@@ -15,11 +15,19 @@ args = parser.parse_args()
 
 d = Dataloader(args.path_train_hdf5, args.path_train_csv,None,None)
 
-augmented_dataset = d.getAugmentedData_Sliced(["add_powerline_noise", "add_baseline_wander"],40)
+base_dataset = d.getBaseData_Sliced(1)
+augmented_dataset = d.getAugmentedData_Sliced(["add_powerline_noise", "add_baseline_wander"],1)
 
+(b_sample) = base_dataset.take(1)
+(a_sample) = augmented_dataset.take(1)
+print(augmented_dataset)
+print(b_sample)
+
+# for image, label in b_sample:
+#     print(image, label)
 # plotter = DataPlotter(
-#     basesignal,
-#     augmsignal,
+#     b_sample,
+#     a_sample,
 #     same_graf=True,
 #     sample_range=[1,5000],
 # )
