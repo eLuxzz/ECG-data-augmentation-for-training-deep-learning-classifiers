@@ -1,40 +1,9 @@
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
-
-python test.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv
 python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name base_model
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name DA_model
 python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name test_model
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name base_model_07_bs32
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name fully_stacked_model_07_bs32_lr_0_001
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name stacked_gauss_model_07_bs32
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name stacked_powerline_07_bs32_model
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name stacked_baseline_07_bs32_model
 
 python dataplotter_tester.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
 
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/fully_stacked_model_07_bs32_lr_0_001.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/test_model-BS32-LR0.001-20250321-132557.keras
 
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_02/base_model.keras --output_file dnn_predicts/base_predict.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_07_bs64.keras --output_file dnn_predicts/base_predict_07_bs64.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_L2.keras --output_file dnn_predicts/base_predict_L2_07.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_07_bs32.keras --output_file dnn_predicts/base_predict_07_bs32.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/stacked_gauss_model.keras --output_file dnn_predicts/stacked_gauss_predict_07.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/stacked_baseline_model.keras --output_file dnn_predicts/stacked_baseline_model_07.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/fully_stacked_model.keras --output_file dnn_predicts/fully_stacked_model_07.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/base_model_07_bs32_hogl2.keras --output_file dnn_predicts/base_predict_07_bs32_hogl2.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/stacked_powerline_07_bs32_model.keras --output_file dnn_predicts/stacked_powerline_07_bs32_predict.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/stacked_baseline_07_bs32_model.keras --output_file dnn_predicts/stacked_baseline_07_bs32_predict.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/stacked_gauss_model_07_bs32.keras --output_file dnn_predicts/stacked_gauss_07_bs32_predict.npy
-python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/fully_stacked_model_07_bs32_lr_0_001.keras --output_file dnn_predicts/fully_stacked_predict_07_bs32_lr_0_001.npy
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/stacked_powerline_07_bs32_predict.npy outputs/stacked_powerline_07_bs32
-
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/stacked_gauss_predict_07.npy outputs/TestFolder
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/base_predict_07.npy outputs/base_07
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/base_predict_07_bs64.npy outputs/base_07_bs64
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/base_predict_07_bs32.npy outputs/base_07_bs32
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/base_predict_07_bs32_hogl2.npy outputs/base_07_bs32_hogl2
-
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/stacked_powerline_07_bs32_predict.npy outputs/Stacked_Powerline_07_bs32
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/stacked_gauss_07_bs32_predict.npy outputs/Stacked_Gauss_07_bs32
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/stacked_baseline_07_bs32_predict.npy outputs/Stacked_Baseline_07_bs32
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/fully_stacked_model_07.npy outputs/fully_stacked_model
-python evalPrediction.py data/PTB_XL_data/test_data.csv dnn_predicts/fully_stacked_predict_07_bs32_lr_0_001.npy outputs/fully_stacked_predict_07_bs32_lr_0_001
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/test_model-BS32-LR0.001-20250321-132557.npy
