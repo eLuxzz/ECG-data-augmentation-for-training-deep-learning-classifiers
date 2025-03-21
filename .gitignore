@@ -134,7 +134,13 @@ dmypy.json
 
 # Added ignores // Kent
 *.keras
+.npy
+*.npy
 
 /logs
-#/trained_models
+/trained_models
+/dnn_predicts/other_seeds
+/dnn_predicts/other_splits
+/dnn_predicts
 /outputs_old
+/outputs
