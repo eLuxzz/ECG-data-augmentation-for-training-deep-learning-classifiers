@@ -11,13 +11,13 @@ from model import get_model
 from datasets import ECGSequence
 from dataloader import Dataloader
 from fileloader import Fileloader
-import numpy as np
 import logging
+
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 mixed_precision.set_global_policy('mixed_float16')
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-# physical_devices = tf.config.list_physical_devices('GPU')
-# tf.config.experimental.set_memory_growth(physical_devices[0], True)
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train neural network.')
@@ -38,76 +38,67 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Optimization settings
-    loss = 'binary_crossentropy'
     lr = 0.001
-    batch_size = 8
+    batch_size = 32
+    
+    # Load data and setup sequences
+    slice = None
+    buffer_size= 10000
+    num_epochs = 40
+    fileloader = Fileloader()
+
+    trainSignalData, trainAnnotationData = fileloader.getData(args.path_train_hdf5,"tracings", args.path_train_csv)
+    train_seq = ECGSequence(trainSignalData, trainAnnotationData, batch_size)
+
+    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, 
+                            args.validation_dataset_name, batch_size, buffer_size=buffer_size,epochs=num_epochs)
+    # tf_dataset = dataloader.getBaseData(sliceIdx=slice)
+    valid_seq = dataloader.getValidationData(sliceIdx=slice)
+    tf_dataset = dataloader.getAugmentedData(["add_powerline_noise"], sliceIdx=slice)
+    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"],sliceIdx=slice)    
+
+    # If you are continuing an interrupted section, uncomment line bellow:
+    # PATH_TO_PREV_MODEL = "backup_model_last.keras"
+    # model = tf.keras.models.load_model(PATH_TO_PREV_MODEL, compile=False)
+    loss = 'binary_crossentropy'
     opt = Adam(lr)
+    model = get_model(train_seq.n_classes)
+    model.compile(loss=loss, optimizer=opt)
+
+    # Create log
+    log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
+    os.makedirs(log_dir, exist_ok=True)
+    # tf.keras.backend.clear_session()
+    # tf.profiler.experimental.start(log_dir)
+    # tensorflow.debugging.experimental.enable_dump_debug_info(log_dir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
+
+    # Callbacks
     callbacks = [ReduceLROnPlateau(monitor='val_loss',
                                    factor=0.1,
                                    patience=5,
                                    min_lr=lr / 1000),
                  EarlyStopping(patience=9,  # Patience should be larger than the one in ReduceLROnPlateau
                                min_delta=0.00001)]
-    # Load data and setup sequences
-    slice = 8
-    buffer_size=10
-    dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, args.validation_dataset_name, batch_size, buffer_size=buffer_size)
-    fileloader = Fileloader()
-
-    trainSignalData, trainAnnotationData = fileloader.getData(args.path_train_hdf5,"tracings", args.path_train_csv)
-    train_seq = ECGSequence(trainSignalData, trainAnnotationData, batch_size)
-
-    # tf_dataset = dataloader.getBaseData(sliceIdx=slice)
-    # tf_dataset = dataloader.getAugmentedData(["add_baseline_wander", "add_powerline_noise", "add_gaussian_noise"])
-    tf_dataset = dataloader.getAugmentedData(["add_baseline_wander"], sliceIdx=slice)
-    valid_seq = dataloader.getValidationData(sliceIdx=slice)
-    print(tf_dataset)
-    # buffer_size= 10000
-    # tf_dataset = tf_dataset.shuffle(buffer_size=buffer_size).prefetch(tf.data.AUTOTUNE)
-
-    # If you are continuing an interrupted section, uncomment line bellow:
-    # PATH_TO_PREV_MODEL = "backup_model_last.keras"
-    # model = tf.keras.models.load_model(PATH_TO_PREV_MODEL, compile=False)
-
-    model = get_model(train_seq.n_classes)
-    model.compile(loss=loss, optimizer=opt)
-    # Create log
-
-    log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
-    os.makedirs(log_dir, exist_ok=True)
-    # tf.keras.backend.clear_session()
-    # tf.profiler.experimental.start(log_dir)
-
-    # tensorflow.debugging.experimental.enable_dump_debug_info(log_dir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
     callbacks += [TensorBoard(log_dir=log_dir, histogram_freq=1, write_graph=True)]
         # Save the BEST and LAST model
     callbacks += [ModelCheckpoint('./backup_model_last.keras'),
                   ModelCheckpoint('./backup_model_best.keras', save_best_only=True)]
+    
     # Train neural network
-    # tf.profiler.experimental.stop()
     print("Start training")
-    steps_per_epoch = (slice) // batch_size
-    def training1():
-        num_epochs = 10
-        for epoch in range(num_epochs):
-            print(f"Epoch {epoch+1}/{num_epochs}")
-            
-            # Recreate the dataset to apply fresh DA each epoch
-            train_dataset = dataloader.getAugmentedData(["add_baseline_wander"], sliceIdx=slice)
-            # Train the model on the new dataset for this epoch
-            model.fit(train_dataset, epochs=1, steps_per_epoch=steps_per_epoch)
-    def training_org():
+    # steps_per_epoch = (slice) // batch_size # Use this when testing with slice.
+    steps_per_epoch = len(trainAnnotationData) // batch_size
+    
+    def training_no_sequence():
         history = model.fit(tf_dataset,
-                            epochs=20,
+                            epochs=num_epochs,
                             initial_epoch=0,  # If you are continuing a interrupted section change here
                             callbacks=callbacks,
                             validation_data=valid_seq,
                             verbose=1,
-                            # steps_per_epoch=(len(trainSignalData)) // batch_size,
                             steps_per_epoch=steps_per_epoch)
     # Save final result
-    training1()
-    # training_org()
+    training_no_sequence()
     model.save(f"./{args.final_model_name}.keras")
     K.clear_session()
     # tf.profiler.experimental.stop()
