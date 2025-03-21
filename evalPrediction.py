@@ -86,10 +86,10 @@ def affer_results(y_true, y_pred):
 parser = argparse.ArgumentParser(description='Eval Predictuib')
 parser.add_argument('path_test_csv', type=str,
                     help='path to csv file containing annotations')
-parser.add_argument('path_predict_npy', type=str,
-                    help='path to npy file containing predictions')
 parser.add_argument('output_folder_path', type=str,
                     help='path to output folder')
+parser.add_argument('path_predict_npy', type=str,
+                    help='path to npy file containing predictions')
 args = parser.parse_args()
 # %% Constants
 score_fun = {'Precision': precision_score,
@@ -98,7 +98,9 @@ score_fun = {'Precision': precision_score,
 diagnosis = ['NORM', 'CD', 'HYP', 'MI', 'STTC']
 nclasses = len(diagnosis)
 predictor_names = ['DNN']
-output_path = args.output_folder_path
+fileName = args.path_predict_npy.split("/")[-1]
+fileName = str.removesuffix(fileName, ".npy")
+output_path = os.path.join(args.output_folder_path, fileName)
 os.makedirs(f"{output_path}/tables",exist_ok=True)
 os.makedirs(f"{output_path}/figures",exist_ok=True)
 
@@ -107,6 +109,7 @@ os.makedirs(f"{output_path}/figures",exist_ok=True)
 y_true = pd.read_csv(args.path_test_csv).values
 # get y_score
 y_score_best = np.load(args.path_predict_npy)
+
 # Get threshold that yield the best precision recall using "get_optimal_precision_recall" on validation set
 #   (we rounded it up to three decimal cases to make it easier to read...)
 threshold = np.array([0.124, 0.07, 0.05, 0.278, 0.390])
@@ -300,81 +303,6 @@ def Boxplot():
 
     scores_resampled_xr.to_dataframe(name='score').to_csv(f'{output_path}/figures/boxplot_bootstrap_data.txt')
     print("Boxplot complete")
-    # %% Compute scores and bootstraped version of these scores on alternative splits
-    bootstrap_nsamples = 1000
-    scores_resampled_list = []
-    scores_percentiles_list = []
-    for name in ['normal_order', 'date_order', 'individual_patients', 'base_model']:
-        print(name)
-        # Get data
-        yn_true = y_true
-        yn_score = np.load('./dnn_predicts/other_splits/model_'+name+'.npy') if not name == 'base_model' else y_score_best
-        # Compute threshold
-        nclasses = np.shape(yn_true)[1]
-        opt_precision, opt_recall, threshold = get_optimal_precision_recall(yn_true, yn_score)
-        mask_n = yn_score > threshold
-        yn_pred = np.zeros_like(yn_score)
-        yn_pred[mask_n] = 1
-        # Compute bootstraped samples
-        np.random.seed(123)  # NEVER change this =P
-        n, _ = np.shape(yn_true)
-        samples = np.random.randint(n, size=n * bootstrap_nsamples)
-        # Get samples
-        y_true_resampled = np.reshape(yn_true[samples, :], (bootstrap_nsamples, n, nclasses))
-        y_doctors_resampled = np.reshape(yn_pred[samples, :], (bootstrap_nsamples, n, nclasses))
-        # Apply functions
-        scores_resampled = np.array([get_scores(y_true_resampled[i, :, :], y_doctors_resampled[i, :, :], score_fun)
-                                    for i in range(bootstrap_nsamples)])
-        # Sort scores
-        scores_resampled.sort(axis=0)
-        # Append
-        scores_resampled_list.append(scores_resampled)
-
-        # Compute percentiles index
-        i = [int(p / 100.0 * bootstrap_nsamples) for p in percentiles]
-        # Get percentiles
-        scores_percentiles = scores_resampled[i, :, :]
-        # Convert percentiles to a dataframe
-        scores_percentiles_df = pd.concat([pd.DataFrame(x, index=diagnosis, columns=score_fun.keys())
-                                        for x in scores_percentiles], keys=['p1', 'p2'], axis=1)
-        # Change multiindex levels
-        scores_percentiles_df = scores_percentiles_df.swaplevel(0, 1, axis=1)
-        scores_percentiles_df = scores_percentiles_df.reindex(level=0, columns=score_fun.keys())
-        # Append
-        scores_percentiles_list.append(scores_percentiles_df)
-
-    # %% Print box plot on alternative splits (Supplementary Figure 2 (a))
-    scores_resampled_xr = xr.DataArray(np.array(scores_resampled_list),
-                                       dims=['predictor', 'n', 'diagnosis', 'score_fun'],
-                                       coords={
-                                        'predictor': ['random', 'by date', 'by patient', 'original DNN'],
-                                        'n': range(bootstrap_nsamples),
-                                        'diagnosis': ['NORM', 'CD', 'HYP', 'MI', 'STTC'],
-                                        'score_fun': list(score_fun.keys())})
-    # Remove everything except f1_score
-    sf = 'F1 score'
-    fig, ax = plt.subplots()
-    f1_score_resampled_xr = scores_resampled_xr.sel(score_fun=sf)
-    # Convert to dataframe
-    f1_score_resampled_df = f1_score_resampled_xr.to_dataframe(name=sf).reset_index(level=[0, 1, 2])
-    # Plot seaborn
-    ax = sns.boxplot(x="diagnosis", y=sf, hue="predictor", data=f1_score_resampled_df,
-                     order=['NORM', 'CD', 'HYP', 'MI', 'STTC'],
-                     palette=sns.color_palette("Set1", n_colors=8))
-    plt.axvline(3.5, color='black', ls='--')
-    plt.axvline(5.5, color='black', ls='--')
-    plt.axvspan(3.5, 5.5, alpha=0.1, color='gray')
-    # Save results
-    plt.xticks(fontsize=16)
-    plt.yticks(fontsize=16)
-    plt.xlabel("")
-    plt.ylabel("F1 score", fontsize=16)
-    plt.legend(fontsize=17)
-    plt.ylim([0.4, 1.05])
-    plt.xlim([-0.5, 5.5])
-    plt.tight_layout()
-    plt.savefig(f'{output_path}/figures/boxplot_bootstrap_other_splits_{{0}}.pdf'.format(sf))
-    f1_score_resampled_df.to_csv(f'{output_path}/figures/boxplot_bootstrap_other_splits_data.txt', index=False)
 
 #%% Usable functions
 Scores()
