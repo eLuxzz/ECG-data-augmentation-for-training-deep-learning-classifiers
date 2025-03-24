@@ -83,45 +83,83 @@ def affer_results(y_true, y_pred):
     cm[fp] = 3
     return tn, tp, fn, fp, cm
 
-parser = argparse.ArgumentParser(description='Eval Predictuib')
-parser.add_argument('path_test_csv', type=str,
-                    help='path to csv file containing annotations')
-parser.add_argument('output_folder_path', type=str,
-                    help='path to output folder')
-parser.add_argument('path_predict_npy', type=str,
-                    help='path to npy file containing predictions')
-args = parser.parse_args()
-# %% Constants
-score_fun = {'Precision': precision_score,
-             'Recall': recall_score, 'Specificity': specificity_score,
-             'F1 score': f1_score}
-diagnosis = ['NORM', 'CD', 'HYP', 'MI', 'STTC']
-nclasses = len(diagnosis)
-predictor_names = ['DNN']
-fileName = args.path_predict_npy.split("/")[-1]
-fileName = str.removesuffix(fileName, ".npy")
-output_path = os.path.join(args.output_folder_path, fileName)
-os.makedirs(f"{output_path}/tables",exist_ok=True)
-os.makedirs(f"{output_path}/figures",exist_ok=True)
+def plotF1AgainstThreshold(): # Helper function
+    # Define candidate binarization thresholds
+    binarization_thresholds = np.linspace(0.05, 0.95, 50)
 
-# %% Read datasets
-# Get true values
-y_true = pd.read_csv(args.path_test_csv).values
-# get y_score
-y_score_best = np.load(args.path_predict_npy)
+    best_thresholds = np.zeros(5)
+    best_f1_scores = np.zeros(5)
 
-# Get threshold that yield the best precision recall using "get_optimal_precision_recall" on validation set
-#   (we rounded it up to three decimal cases to make it easier to read...)
-threshold = np.array([0.124, 0.07, 0.05, 0.278, 0.390])
-mask = y_score_best > threshold
-y_true = y_true > threshold
-# Get neural network prediction
-y_neuralnet = np.zeros_like(y_score_best)
-y_neuralnet[mask] = 1
-y_neuralnet[mask] = 1
+    # Create a plot for each class
+    plt.figure(figsize=(10, 6))
 
+    for class_idx in range(5):
+        f1_list = []
+        best_f1 = 0
+        best_thresh = 0
 
-scores_list = []
+        for bin_thresh in binarization_thresholds:
+            y_true_bin = (y_true_raw[:, class_idx] >= bin_thresh).astype(int)  # Binarize y_true
+            y_score_bin = (y_score_best[:, class_idx] >= bin_thresh).astype(int)  # Binarize y_true
+            
+            # Compute F1-score at each threshold
+            f1_scores = f1_score(y_true_bin, y_score_bin)
+
+            # Store best F1-score across all PR curve thresholds
+            f1_list.append(f1_scores)
+
+            # Update best threshold
+            if f1_scores > best_f1:
+                best_f1 = f1_scores
+                best_thresh = bin_thresh
+
+        # Store best threshold per class
+        best_thresholds[class_idx] = best_thresh
+        best_f1_scores[class_idx] = best_f1
+        # best_thresholds = threshold
+        # Plot for this class
+        plt.plot(binarization_thresholds, f1_list, label=f"Class {class_idx} (Best Thresh: {best_thresh:.3f})")
+
+    # Final plot settings
+    plt.xlabel("Binarization Threshold for y_true")
+    plt.ylabel("F1-score")
+    plt.title("Optimal Binarization Threshold Per Class (Maximizing F1-score)")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    print(np.average(best_f1_scores))
+    print("Best Thresholds Per Class:", best_thresholds)
+    print("Best F1-scores Per Class:", best_f1_scores)
+
+def find_best_threshold(): # Finds best threshold for F1 score
+    num_classes = y_true_raw.shape[1]  # Number of classes
+    thresholds = np.linspace(0.05, 0.95, 50)  # Candidate thresholds
+    best_thresholds = np.zeros(num_classes)
+
+    # Iterate over each class to find the best threshold
+    for class_idx in range(num_classes):
+        best_f1 = 0
+        best_thresh = 0
+        
+        for threshold in thresholds:
+            # Convert soft labels to binary using the threshold
+            y_true_bin = (y_true_raw[:, class_idx] >= threshold).astype(int)
+            y_pred_bin = (y_score_best[:, class_idx] >= threshold).astype(int)
+
+            # Compute F1-score
+            f1 = f1_score(y_true_bin, y_pred_bin)
+
+            # Update best threshold
+            if f1 > best_f1:
+                best_f1 = f1
+                best_thresh = threshold
+
+        best_thresholds[class_idx] = best_thresh
+        # print(f"Best threshold for class {class_idx}: {best_thresh}, Best F1: {best_f1}")
+    print("Final optimal thresholds:", best_thresholds)
+    return best_thresholds
+
 def Scores():
     # %% Generate table with scores for the average model (Table 2)
     for y_pred in [y_neuralnet]:
@@ -303,6 +341,65 @@ def Boxplot():
 
     scores_resampled_xr.to_dataframe(name='score').to_csv(f'{output_path}/figures/boxplot_bootstrap_data.txt')
     print("Boxplot complete")
+
+
+parser = argparse.ArgumentParser(description='Evaluate Prediction by F1 score.')
+parser.add_argument('path_test_csv', type=str,
+                    help='path to csv file containing annotations')
+parser.add_argument('output_folder_path', type=str,
+                    help='path to output folder')
+parser.add_argument('path_predict_npy', type=str,
+                    help='path to npy file containing predictions')
+args = parser.parse_args()
+# %% Constants
+score_fun = {'Precision': precision_score,
+             'Recall': recall_score, 'Specificity': specificity_score,
+             'F1 score': f1_score}
+diagnosis = ['NORM', 'CD', 'HYP', 'MI', 'STTC']
+nclasses = len(diagnosis)
+predictor_names = ['DNN']
+fileName = args.path_predict_npy.split("/")[-1]
+fileName = str.removesuffix(fileName, ".npy")
+output_path = os.path.join(args.output_folder_path, fileName)
+os.makedirs(f"{output_path}/tables",exist_ok=True)
+os.makedirs(f"{output_path}/figures",exist_ok=True)
+
+
+# %% Read datasets
+# Get true values (soft labels, probability)
+y_true_raw =  pd.read_csv(args.path_test_csv).values
+
+# get y_score (soft labels, probability)
+y_score_best = np.load(args.path_predict_npy)
+
+
+# %% Binarize the soft labels
+# Get threshold that yield the best precision recall using "get_optimal_precision_recall" on validation set
+#   (we rounded it up to three decimal cases to make it easier to read...)
+
+# This is the threshold for determining the binarization
+# threshold = np.array([0.124, 0.07, 0.05, 0.278, 0.390]) # Original valus from Riberio
+# threshold = np.array([0.49, 0.49, 0.49, 0.49, 0.49]) # Init values for getting opt values
+
+# Used model for testing PR vs FBT for thresholding
+# python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-134701.npy
+# threshold = np.array([0.307, 0.436, 0.123, 0.123, 0.142]) # Threshold values from find_best_threshold
+# threshold = np.array([0.402, 0.436, 0.136, 0.189, 0.136]) # PR threshold from get_optimal_precision_recall, using test set and thresholding on 0.49.
+
+threshold =  find_best_threshold() # Dynamic threshold
+# threshold = [0.399,0.385,0.110,0.1645,0.26125] # Tog en average av 4 FBT thresholds.
+
+mask = y_score_best > threshold # This is a true/false matrix
+y_true = y_true_raw > threshold # This is a true/false matrix, works with the sklearn functions.
+
+# opt_prec, opt_rec, opt_thres = get_optimal_precision_recall(y_true,y_score_best) # Calculates best threshold for PR.
+# print(opt_thres)
+
+# Get neural network prediction
+y_neuralnet = np.zeros_like(y_score_best)
+y_neuralnet[mask] = 1 # This converts true/false matrix into binary
+
+scores_list = []
 
 #%% Usable functions
 Scores()
