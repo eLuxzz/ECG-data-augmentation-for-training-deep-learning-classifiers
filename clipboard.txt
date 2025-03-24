@@ -1,9 +1,50 @@
 python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name base_model
-python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name test_model
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name BL_G_PL_model --DA "add_baseline_wander" "add_gaussian_noise" "add_powerline_noise"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name G_PL_model --DA "add_gaussian_noise" "add_powerline_noise"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name BL_PL_model --DA "add_baseline_wander" "add_powerline_noise"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name G_BL_model --DA "add_gaussian_noise" "add_baseline_wander"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name TW_model --DA "add_time_warp"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name G_model --DA "add_gaussian_noise"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name BL_model --DA "add_baseline_wander"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name PL_model --DA "add_powerline_noise"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name ATW --DA "add_time_warp"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name TWC_Repeat_LastValue --DA "time_warp_crop"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name base_model
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name TWC_RLV_AWT --DA "time_warp_crop" "add_time_warp"
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name TWC_RLV_G --DA "time_warp_crop" "add_gaussian_noise"
 
+python train.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name test_model --DA "time_warp_crop"
+
+python dataloader_tester.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv data/PTB_XL_data/signals_valid.hdf5 data/PTB_XL_data/validation_data.csv --final_model_name test_loader
 python dataplotter_tester.py data/PTB_XL_data/signals_train.hdf5 data/PTB_XL_data/train_data.csv
+python test.py data/PTB_XL_data/signals_test.hdf5 data/PTB_XL_data/test_data.csv trained_models/BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001_Restorebestweights_false/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-134701.keras
+python test.py data/PTB_XL_data/signals_test.hdf5 data/PTB_XL_data/test_data.csv trained_models/BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001_Restorebestweights_false/G_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-161552.keras
+
 
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/Dropout_07/fully_stacked_model_07_bs32_lr_0_001.keras
 python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/test_model-BS32-LR0.001-20250321-132557.keras
 
-python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/test_model-BS32-LR0.001-20250321-132557.npy
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/base_model_classweight-BS32-LR0.001-DR_Keep_P0.5-DA_P0.6-L20.001-20250321-223133.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.6-L20.001-20250321-211615.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/base_model-BS32-LR0.001-DR_Keep_P0.7-DA_P0.6-L20.001-20250321-201505.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/BL_G_PL_model_classweight-BS32-LR0.001-DR_Keep_P0.5-DA_P0.6-L20.001-20250321-230750.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/BL_G_PL_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.6-L20.001-20250321-214521.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/BL_G_PL_model-BS32-LR0.001-DR_Keep_P0.7-DA_P0.6-L20.001-20250321-204242.keras
+
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/base_model-BS32-LR0.002-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250323-114347.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/G_model-BS32-LR0.002-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250323-123539.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001_Restorebestweights_false/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-134701.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 trained_models/BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001_Restorebestweights_false/G_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-161552.keras
+python predict.py data/PTB_XL_data/signals_test.hdf5 
+
+
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-134701.npy
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/base_model-BS32-LR0.002-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250323-114347.npy
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/G_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-161552.npy
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/G_model-BS32-LR0.002-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250323-123539.npy
+python evalPrediction.py data/PTB_XL_data/test_data.csv outputs 
+
+[0.307 0.436 0.123 0.123 0.142]
+[0.454 0.381 0.105 0.197 0.307]
+[0.344 0.270 0.087 0.123 0.362]
+[0.491 0.454 0.123 0.215 0.234]

@@ -136,7 +136,7 @@ dmypy.json
 *.keras
 .npy
 *.npy
-
+test.py
 /logs
 /trained_models
 /dnn_predicts/other_seeds
