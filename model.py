@@ -115,7 +115,7 @@ class ResidualUnit(object):
         return [x, y]
 
 
-def get_model(n_classes, dropout_keep_prob = 0.7, last_layer='sigmoid', l2_lambda =0.001):
+def get_model(n_classes, dropout_keep_prob = 0.7, last_layer='sigmoid', l2_lambda = 0.001):
     kernel_size = 16
     kernel_initializer = 'he_normal'
     signal = Input(shape=(5000, 12), dtype=np.float16, name='signal')
