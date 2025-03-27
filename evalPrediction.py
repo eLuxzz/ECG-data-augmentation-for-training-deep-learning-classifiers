@@ -1,3 +1,5 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import pandas as pd
 import numpy as np
 from sklearn.metrics import (confusion_matrix,
@@ -8,9 +10,6 @@ import seaborn as sns
 import argparse
 import os
 import xarray as xr
-from scipy.stats.distributions import chi2
-from itertools import combinations
-
 
 # %% Auxiliar functions
 def get_scores(y_true, y_pred, score_fun):

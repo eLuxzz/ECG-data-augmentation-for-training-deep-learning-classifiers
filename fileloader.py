@@ -28,7 +28,7 @@ class Fileloader:
         Returns:
             signals [float32]: An array containing all data signals
         """
-        file = (h5py.File(pathHDF5, "r"))
+        file = (h5py.File(pathHDF5, "r", swmr=True))
         signals = file[setName]
         self.files.append(file)
         return signals
