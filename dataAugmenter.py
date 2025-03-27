@@ -3,16 +3,16 @@ import tensorflow as tf
 class DataAugmenter:
     def __init__(self, timesteps = 5000, leads=12):
         self.timesteps = timesteps
-        self.leads = leads
+        self.n_leads = leads
         pass
-    
+    @tf.function
     def add_gaussian_noise(self, signalData,label, mean=0, std=0.02):
         """
         Adds Gaussian noise to the ECG signal.
         
         Parameters:
         signalData: ndarray
-            Input ECG data with shape (batch, timesteps, channels)
+            Input ECG data with shape (timesteps, leads)
         mean: float
             Mean of the Gaussian noise
         std: float
@@ -25,13 +25,13 @@ class DataAugmenter:
         gaussian_noise = tf.random.normal(shape=tf.shape(signalData), mean=mean, stddev=std, dtype=tf.float32)
         return signalData + gaussian_noise, label
     
-    def add_powerline_noise(self, signalData,label, frequency=50, amplitude=0.1, sampling_rate=500):
+    def add_powerline_noise(self, signalData,label, frequency=50, amplitude=0.15, sampling_rate=500):
         """
         Adds sinusoidal powerline noise to the ECG signal.
         
         Parameters:
         signalData: ndarray
-            Input ECG data with shape (batch, timesteps, channels)
+            Input ECG data with shape (timesteps, leads)
         frequency: float
             Frequency of powerline noise (default: 50Hz)
         amplitude: float
@@ -43,10 +43,34 @@ class DataAugmenter:
         augmented_data: ndarray
             ECG data with added powerline noise
         """
+        amplitude = tf.random.uniform((), 0.05, amplitude, dtype=tf.float32)
         t = np.linspace(0, signalData.shape[1] / sampling_rate, signalData.shape[1], dtype=np.float16)
         powerline_noise = amplitude * np.sin(2 * np.pi * frequency * t, dtype=np.float16)
-        
+
         return signalData + powerline_noise, label
+    
+    @tf.function
+    def random_scaling(self, signalData,label):
+        """
+        Adds random scaling noise to the ECG signal.
+        
+        Parameters:
+        signalData: ndarray
+            Input ECG data with shape (timesteps, leads)
+        label: ndarray
+            The annotations belonging to the signal
+        Returns:
+        augmented_data: ndarray
+            ECG data with added random scaling
+        """
+        #NOTE: Denna ger väldigt kantiga kurvor
+        # Find the max value in each lead (column), and set a dynamic scaling factor as a percentage of the max value for each lead
+        reduce_max = tf.reduce_max(tf.abs(signalData), axis=0)
+        scaling = tf.random.uniform(signalData.shape, reduce_max*0.08, reduce_max*0.2, dtype=tf.float32)
+        # Randomly decide whether to add or subtract the scaling
+        sign = tf.random.uniform((), 0, 2, dtype=tf.int32)  # Random integer: 0 or 1
+        # Apply the scaling based on the random choice (0 -> add, 1 -> subtract)
+        return signalData + tf.where(sign == 0, scaling, -scaling), label
     
     def add_baseline_wander(self, signalData, label, frequency=0.5, amplitude=0.1, sampling_rate=500):
         """
@@ -54,7 +78,7 @@ class DataAugmenter:
         
         Parameters:
         signalData: ndarray
-            Input ECG data with shape (batch, timesteps, channels)
+            Input ECG data with shape (timesteps, leads)
         frequency: float
             Frequency of the baseline wander (default: 0.5Hz)
         amplitude: float
@@ -66,18 +90,19 @@ class DataAugmenter:
         augmented_data: ndarray
             ECG data with added baseline wander noise
         """
-
         t = np.linspace(0, signalData.shape[1] / sampling_rate, signalData.shape[1], dtype=np.float16)
+        amplitude = tf.random.uniform((), 0.05, amplitude, dtype=tf.float32)
         noise = amplitude * np.sin(2 * np.pi * frequency * t, dtype=np.float16)
-
         return signalData + noise, label  # Returns a new array
+    
+    @tf.function
     def add_time_warp(self, signal, label, warp_factor_range=(0.5, 1.5)):
         """
         Randomly stretches or compresses the ECG signal in time.
 
         Parameters:
         signalData: Tensor
-            Input ECG data with shape (timesteps, channels)
+            Input ECG data with shape (timesteps, leads)
         label: Tensor
             Corresponding label
         warp_factor_range: tuple
@@ -93,14 +118,10 @@ class DataAugmenter:
         # timesteps = tf.shape(signal)[0]  # Expected to be 5000
         # num_leads = tf.shape(signal)[1]  # Expected to be 12
 
-        timesteps = self.timesteps
-        num_leads = self.leads
-
-
         # Generate a random warp factor
-        warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1])
+        warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1], dtype=tf.float16)
         # Compute new time indices
-        warped_timesteps = tf.cast(tf.round(tf.cast(timesteps, tf.float32) * warp_factor), tf.int32)
+        warped_timesteps = tf.cast(tf.round(tf.cast(self.timesteps, tf.float16) * warp_factor), tf.int16)
 
         # Switch lead as prep for resize, as resize 
         # Lead 3 & 4
@@ -109,22 +130,22 @@ class DataAugmenter:
         signal = tf.gather(signal, switchIndex, axis=1) 
 
         # Reshape signal for correct warping
-        # signal_expanded = tf.transpose(signal, [1, 0])  # Change to (12, 5000)
-        signal = tf.expand_dims(signal, axis=-1)  # Shape (12, 5000, 1)
+        signal = tf.expand_dims(signal, axis=-1)  # Shape (5000, 12, 1)
 
         # Apply time warping with bilinear interpolation
         # warped_signal = tf.image.resize(signal_expanded, [num_leads, warped_timesteps], method="bilinear")
-        signal = tf.image.resize(signal, [warped_timesteps, num_leads], method="lanczos3")
+        signal = tf.image.resize(signal, [warped_timesteps, self.n_leads], method="lanczos3")
 
         # Restore shape to (5000, 12)
-        signal = tf.image.resize(signal, [timesteps, num_leads], method="gaussian")  # Resize back
+        signal = tf.image.resize(signal, [self.timesteps, self.n_leads], method="gaussian")  # Resize back
         signal = tf.squeeze(signal, axis=-1)  # Remove extra dim
-        # warped_signal = tf.transpose(warped_signal, [1, 0])  # Back to (5000, 12)
 
+        signal = tf.cast(signal, dtype=tf.float32) # Resize returns float32, so cast it to float16
         signal = tf.gather(signal, switchIndex, axis=1)
 
         return signal, label
     
+    @tf.function
     def time_warp_crop(self, signal, label, warp_factor_range=(0.85, 1.5)):
         """
         Applies time warping to a 12-lead ECG signal and crops instead of resizing.
@@ -138,14 +159,12 @@ class DataAugmenter:
         Returns:
         Warped and cropped ECG signal (same shape as input)
         """
-        # timesteps = tf.shape(signal)[0]  # 5000
-        # num_leads = tf.shape(signal)[1]  # 12
-        timesteps = self.timesteps
-        num_leads = self.leads
+       
         # Choose a strong warp factor for noticeable changes
-        warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1])
+        warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1], dtype=tf.float16)
         # Compute new length after warping
-        warped_timesteps = tf.cast(tf.round(tf.cast(timesteps, tf.float32) * warp_factor), tf.int32)
+        warped_timesteps = tf.cast(tf.round(tf.cast(self.timesteps, tf.float16) * warp_factor), tf.int16)
+        
         #-------------
         # Generate new time indices for interpolation
         # original_indices = tf.linspace(0.0, tf.cast(timesteps - 1, tf.float32), timesteps)
@@ -158,11 +177,11 @@ class DataAugmenter:
         #-------------
         # warped_signal = tf.map_fn(interp_lead, tf.transpose(signal), dtype=tf.float32)
         # warped_signal = tf.transpose(warped_signal)  # Convert back to (timesteps, 12)
-
         signal = tf.expand_dims(signal, axis=-1)  # Shape (5000, 12, 1)
-        signal = tf.image.resize(signal, [warped_timesteps, num_leads], method="bilinear") # interpolate as an img
+        # Note for resize, returns dtype=float32 unless method is neareset
+        signal = tf.image.resize(signal, [warped_timesteps, self.n_leads], method="nearest") # interpolate as an img
         signal = tf.squeeze(signal, axis=-1)  # Remove extra dim
-
+        
         # # **Instead of resizing, crop to original length**
         # if warped_timesteps > timesteps:
         #     # If stretched, take only the first 5000 samples
@@ -181,11 +200,15 @@ class DataAugmenter:
         # signal = tf.ensure_shape(signal, [timesteps, num_leads]) # tf thingy, as the variable timesteps, num:leads is a symbolic value, and this requires constant int
 
         signal = tf.cond(
-        warped_timesteps > timesteps,
-        lambda: signal[:timesteps, :],  # Crop if too long
-        lambda: tf.concat([signal, tf.repeat(signal[-1:, :], timesteps - warped_timesteps, axis=0)], axis=0)
-        # lambda: tf.pad(signal, [[0, timesteps - warped_timesteps], [0, 0]], mode="CONSTANT")  # Efficient padding
-    )
-        signal.set_shape([timesteps, num_leads])  
+            warped_timesteps > self.timesteps,
+            lambda: signal[:self.timesteps, :],  # Crop if too long
+            lambda: tf.concat([signal, tf.repeat(signal[-1:, :], self.timesteps - warped_timesteps, axis=0)], axis=0)
+            # lambda: tf.pad(signal, 
+            #                [[0, self.timesteps - warped_timesteps], [0, 0]], 
+            #                mode="CONSTANT", 
+            #                constant_values=signal[-1, :])  # Efficient padding
+        )
+        signal.set_shape([self.timesteps, self.n_leads])  
+        
         return signal, label    
 
