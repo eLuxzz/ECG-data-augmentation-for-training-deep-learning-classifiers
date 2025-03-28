@@ -137,6 +137,7 @@ dmypy.json
 .npy
 *.npy
 test.py
+/logs
 /trained_models
 /dnn_predicts/other_seeds
 /dnn_predicts/other_splits
