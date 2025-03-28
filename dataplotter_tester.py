@@ -13,15 +13,15 @@ args = parser.parse_args()
 
 d = Dataloader(args.path_train_hdf5, args.path_train_csv,None,None, DA_P=1)
 
-base_dataset = d.getTrainingData_Plot(sliceIdx=1)
+base_dataset = d.getTrainingData_Plot(sliceIdx=10)
 
 # augmented_dataset = d.getTrainingData_Plot(["add_gaussian_noise"],1)
 # augmented_dataset = d.getTrainingData_Plot(["add_powerline_noise"],1)
-augmented_dataset = d.getTrainingData_Plot(["time_warp_crop"],1)
+augmented_dataset = d.getTrainingData_Plot(["median_filter"],10)
 # augmented_dataset = d.getTrainingData_Plot(["add_time_warp"],1)
 
-(b_sample) = base_dataset.take(1)
-(a_sample) = augmented_dataset.take(1)
+(b_sample) = base_dataset.take(10)
+(a_sample) = augmented_dataset.take(10)
 # print(b_sample)
 
 # print(a_sample)
@@ -31,16 +31,10 @@ for sample in b_sample:
 for sample in a_sample:
     a_signal = sample
     print(f"DA: Shape after da: {sample[0].shape}, {sample[1].shape}")    
-f = True
-for s in b_signal[0]:
-    if f:
-        f = False
-        b = s
-f = True
-for d in a_signal[0]:
-    if  f:
-        f = False
-        a = d
+# index 7 har en baseline wander, men inte index 8. Om man kör baseline_wander så läggs index 7s baseline wander på index 8.
+b = b_signal[0][8]
+a = a_signal[0][8]
+
 # print(b)
 # print("-----------------")
 # print(a)

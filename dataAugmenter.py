@@ -4,6 +4,7 @@ class DataAugmenter:
     def __init__(self, timesteps = 5000, leads=12):
         self.timesteps = timesteps
         self.n_leads = leads
+        self.baseline = tf.Variable(tf.zeros((5000, 12)), trainable=False)
         pass
     @tf.function
     def add_gaussian_noise(self, signalData,label, mean=0, std=0.02):
@@ -211,4 +212,44 @@ class DataAugmenter:
         signal.set_shape([self.timesteps, self.n_leads])  
         
         return signal, label    
+    def median_filter(self, signal, label, kernel_size=101):
+        """Apply a 1D median filter to each lead of the ECG signal.
+        
+        Args:
+            signal: Tensor of shape (5000, 12), representing the ECG signal.
+            kernel_size: The window size of the median filter (should be odd).
+        
+        Returns:
+            Filtered signal with baseline wander removed.
+        """
+        # Ensure kernel size is odd
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        # Pad signal to handle edge effects (padding is done symmetrically)
+        pad_size = kernel_size // 2
+        padded_signal = tf.pad(signal, [[pad_size, pad_size], [0, 0]], mode="SYMMETRIC")
+        padded_signal = tf.expand_dims(padded_signal, axis=0)  # Shape (1, 5000, 12)
+        
+        
+        # Apply median filter using a sliding window
+        padded_signal = tf.map_fn(lambda lead: tf.nn.pool(
+            input=tf.expand_dims(lead, axis=0), 
+            window_shape=[kernel_size], 
+            pooling_type='AVG',  # Approximate median using average pooling
+            padding='VALID',
+            strides=[1]
+        )[0], padded_signal)  # Transpose so we apply along time
+        
+        padded_signal = tf.squeeze(padded_signal, 0)
+        # Remove baseline wander by subtracting the median-filtered signal
+        signal = signal - padded_signal
+        if self.baseline is not None:
+            # add baseline wander from previous processed signal.
+            signal = signal + self.baseline
+        # Store baseline.
+        self.baseline.assign(padded_signal)
+        return signal, label
+
+
+
 
