@@ -11,13 +11,13 @@ parser.add_argument('path_train_csv', type=str,
 
 args = parser.parse_args()
 
-d = Dataloader(args.path_train_hdf5, args.path_train_csv,None,None, DA_P=1)
+d = Dataloader(args.path_train_hdf5, args.path_train_csv,None,None, DA_P=5)
 
 base_dataset = d.getTrainingData_Plot(sliceIdx=1)
 
 # augmented_dataset = d.getTrainingData_Plot(["add_gaussian_noise"],1)
 # augmented_dataset = d.getTrainingData_Plot(["add_powerline_noise"],1)
-augmented_dataset = d.getTrainingData_Plot(["time_warp_crop"],1)
+augmented_dataset = d.getTrainingData_Plot(["host_guest_augmentation"],5)
 # augmented_dataset = d.getTrainingData_Plot(["add_time_warp"],1)
 
 (b_sample) = base_dataset.take(1)
@@ -48,8 +48,8 @@ plotter = DataPlotter(
     b,
     a,
     same_graf=True,
-    # sample_range=[900,1200],
-    sample_range=[0,5000],
+    #sample_range=[900,1200],
+    sample_range=[0,5000]
 )
 plotter1 = DataPlotter(
     b,
@@ -58,4 +58,4 @@ plotter1 = DataPlotter(
     sample_range=[0,5000],
 )
 plotter.plot()
-# plotter1.plot()
+#plotter1.plot()

@@ -212,3 +212,26 @@ class DataAugmenter:
         
         return signal, label    
 
+    @tf.function
+    def host_guest_augmentation(self, signalData, label, level=5, tolerance=0.1):
+        """
+        Implementerar Host-Guest-principen för EKG-signalaugmentering.
+        """
+        segment_length = self.timesteps // level
+        signal_copy = tf.identity(signalData)
+        
+        for i in range(level - 1):
+            start_idx = i * segment_length
+            end_idx = (i + 1) * segment_length
+            
+            host_segment = signalData[start_idx:end_idx, :]
+            guest_segment = signalData[end_idx:(end_idx + segment_length), :] if end_idx + segment_length < self.timesteps else signalData[:segment_length, :]
+            
+            difference = tf.abs(host_segment - guest_segment)
+            mask = difference > tolerance  # Identifiera skillnader
+            print(mask)
+            
+            modified_segment = tf.where(mask, guest_segment, host_segment)
+            signal_copy = tf.tensor_scatter_nd_update(signal_copy, tf.range(start_idx, end_idx)[:, None], modified_segment)
+        
+        return signal_copy, label
