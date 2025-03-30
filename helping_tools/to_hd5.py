@@ -5,6 +5,8 @@ import os
 from tqdm import tqdm
 
 # Paths
+
+records_start_path = "C:/Users/amjad/Downloads/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/" #ÄNDRA ÄNDRA 
 path_record_train = "data/PTB_XL_data/RECORDS_TRAIN.txt"  # Path to the record list
 path_record_test = "data/PTB_XL_data/RECORDS_TEST.txt"
 path_record_valid = "data/PTB_XL_data/RECORDS_VALID.txt"
@@ -32,7 +34,7 @@ def CreateHDF5(recordsPath, outputPath):
         for i, path in enumerate(tqdm(records, desc="Processing records")):
             try:
                 # Read the ECG record
-                record = wfdb.rdrecord(path)  # WFDB will find .dat and .hea automatically
+                record = wfdb.rdrecord(records_start_path+path)  # WFDB will find .dat and .hea automatically
                 signals = record.p_signal  # Shape (5000, 12)
                 # Store in HDF5 file
                 
@@ -45,9 +47,10 @@ def CreateHDF5(recordsPath, outputPath):
                 
                 dataset[i] =  signals
             except Exception as e:
-                print(f"Error processing {path}: {e}")
+               print(f"Error processing {records_start_path+path}: {e}")
 
-    print(f"Successfully saved {num_records} records to {path_hdf5_train}")
+
+    print(f"Successfully saved {num_records} records to {outputPath}")
 CreateHDF5(path_record_test, path_hdf5_test)
 CreateHDF5(path_record_train, path_hdf5_train)
 CreateHDF5(path_record_valid, path_hdf5_valid)
