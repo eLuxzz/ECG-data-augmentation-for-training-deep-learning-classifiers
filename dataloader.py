@@ -3,6 +3,7 @@ from dataAugmenter import DataAugmenter
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import numpy as np
+from imblearn.over_sampling import RandomOverSampler
 class Dataloader():
     def __init__(self, pathHDF5_training, pathCSV_training, pathHDF5_valid, pathCSV_valid, 
                  setNameTraining = "tracings", setNameValid="tracings",
@@ -35,7 +36,7 @@ class Dataloader():
 
         self.n_classes = None
         self._DA = DataAugmenter()
-        self._Fileloader = Fileloader()
+        self.fileloader = Fileloader()
         self.DA_Methods = []
 
         self.DA_index = tf.Variable(0, trainable=False, dtype=tf.int32)
@@ -47,16 +48,28 @@ class Dataloader():
                 - signalData_training [any]: Base training data
                 - annotationData_training [any]: Annotation data
         """
-        signalData_training, annotationData_training = self._Fileloader.getData(self.PathHDF5_training, self.SetName_Training, self.PathCSV_training)
+        signal_training, labels_training = self.fileloader.getData(self.PathHDF5_training, self.SetName_Training, self.PathCSV_training)
         
-        self.datasetLength = len(annotationData_training)
-        self.n_classes = annotationData_training.shape[1]
+        self.n_classes = labels_training.shape[1]
         
+        balanced_idx = self.get_oversampled_indices(labels_training)
+        
+        self.datasetLength = len(balanced_idx)
+        n_balancedIdx = len(balanced_idx)
         def dataset_generator():
-            for i in range(len(signalData_training) if sliceIdx is None else sliceIdx):
-                # yield tf.cast(signalData_training[i], dtype=tf.float16), tf.cast(annotationData_training[i], dtype=tf.float16)
-                yield signalData_training[i], annotationData_training[i]
+            if sliceIdx:
+                for i in range(n_balancedIdx if sliceIdx is None else sliceIdx):
+                    # yield tf.cast(signalData_training[i], dtype=tf.float16), tf.cast(annotationData_training[i], dtype=tf.float16)
 
+                    yield signal_training[i], labels_training[i]
+            else:
+                i = 0
+                while True:
+                    idx = balanced_idx[i]
+                    i +=1
+                    yield signal_training[idx], labels_training[idx]
+                    if i >= n_balancedIdx:
+                        i = 0
         # Wrap the generator in tf.data.Dataset
         dataset = tf.data.Dataset.from_generator(
             dataset_generator,
@@ -69,10 +82,42 @@ class Dataloader():
         )
         return dataset
     def update_DAMethod_index(self):
-            index = tf.random.uniform((), 0, len(self.DA_Methods), dtype=tf.int32)
+            if self.DAMethods_len == 0:
+                return
+            index = tf.random.uniform((), 0, self.DAMethods_len, dtype=tf.int32)
             self.DA_index.assign(index) # tf.variable so updates are seen when running in graph mode w map() func
             print(f"\n Selected DA method: {self.DA_Methods[index]}")
+            
+    def get_oversampled_indices(self, labels):
+        """
+        Uses RandomOverSampler to generate balanced indices.
 
+        Args:
+            csv_path (str): Path to the CSV file.
+
+        Returns:
+            np.ndarray: Oversampled indices for balanced dataset.
+        """
+        TARGET_HYP_SAMPLES = 3100
+        y_classes = np.argmax(labels, axis=1)  # Convert one-hot labels to class indices
+        indices = np.arange(len(labels))  # Original indices
+
+        # Count existing HYP samples
+        hyp_indices = np.where(y_classes == 2)[0]
+        current_hyp_count = len(hyp_indices)
+
+        if current_hyp_count >= TARGET_HYP_SAMPLES:
+            return indices  # No need for oversampling
+
+        # Define custom sampling strategy (only oversample HYP)
+        sampling_strategy = {cls: count for cls, count in zip(*np.unique(y_classes, return_counts=True))}
+        sampling_strategy[2] = min(TARGET_HYP_SAMPLES, 5000)  # Set HYP to ~5000
+
+        ros = RandomOverSampler(sampling_strategy=sampling_strategy)
+        oversampled_indices, _ = ros.fit_resample(indices.reshape(-1, 1), y_classes)
+
+        return oversampled_indices.flatten()
+    
     def getTrainingData(self, DAMethods = [], sliceIdx = None):
         """Augmentate base data in the order the methods is provided.
         Args:
@@ -85,7 +130,10 @@ class Dataloader():
         dataset = self.__getBaseDataset(sliceIdx)
         self.DA_Methods = DAMethods
         len_DAMethods = len(DAMethods)
+        self.DAMethods_len = len_DAMethods
         def apply_augmentation(x, y):  # Tensorflow runs this in graph mode and only trace it once. Any changes in variables won't be seen, unless it is an tf.Variable
+            if len_DAMethods == 0:
+                return x,y
             if tf.random.uniform((), dtype=tf.float16) < self.DA_P:  # Randomly apply augmentations
                 index = self.DA_index.read_value()  # Correct way to read tf.Variable in graph mode
                 for i in range(0, len_DAMethods):
@@ -106,7 +154,7 @@ class Dataloader():
         
         # First Epoch: No DA, just shuffled & batched
         base_epoch = dataset.shuffle(self.buffer_size, reshuffle_each_iteration=True, seed=42) \
-                        .repeat(5) \
+                        .repeat(2) \
                         .batch(self.batch_size) \
                         .prefetch(tf.data.AUTOTUNE) \
 
@@ -155,7 +203,7 @@ class Dataloader():
             signalData_validation: Signal Data for validation
             annoatationData_validation: Annotation Data
         """
-        signalData_validation, annotationData_validation = self._Fileloader.getData(self.PathHDF5_valid,self.SetName_Valid, self.PathCSV_valid)
+        signalData_validation, annotationData_validation = self.fileloader.getData(self.PathHDF5_valid,self.SetName_Valid, self.PathCSV_valid)
         if sliceIdx:
             signalData_validation = signalData_validation[:sliceIdx]
             annotationData_validation = annotationData_validation[:sliceIdx]

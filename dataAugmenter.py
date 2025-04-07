@@ -7,7 +7,7 @@ class DataAugmenter:
         self.baseline = tf.Variable(tf.zeros((5000, 12)), trainable=False)
         pass
     @tf.function
-    def add_gaussian_noise(self, signalData,label, mean=0, std=0.02):
+    def add_gaussian_noise(self, signalData,label, mean=0, std=0.007):
         """
         Adds Gaussian noise to the ECG signal.
         
@@ -50,6 +50,29 @@ class DataAugmenter:
 
         return signalData + powerline_noise, label
     
+    def add_baseline_wander(self, signalData, label, frequency=0.5, amplitude=0.1, sampling_rate=500):
+        """
+        Adds baseline wander noise to the ECG signal.
+        
+        Parameters:
+        signalData: ndarray
+            Input ECG data with shape (timesteps, leads)
+        frequency: float
+            Frequency of the baseline wander (default: 0.5Hz)
+        amplitude: float
+            Amplitude of the noise
+        sampling_rate: int
+            Sampling rate of the signal
+        
+        Returns:
+        augmented_data: ndarray
+            ECG data with added baseline wander noise
+        """
+        t = np.linspace(0, signalData.shape[1] / sampling_rate, signalData.shape[1], dtype=np.float16)
+        amplitude = tf.random.uniform((), 0.05, amplitude, dtype=tf.float32)
+        noise = amplitude * np.sin(2 * np.pi * frequency * t, dtype=np.float16)
+        return signalData + noise, label  # Returns a new array
+    
     @tf.function
     def random_scaling(self, signalData,label):
         """
@@ -73,28 +96,6 @@ class DataAugmenter:
         # Apply the scaling based on the random choice (0 -> add, 1 -> subtract)
         return signalData + tf.where(sign == 0, scaling, -scaling), label
     
-    def add_baseline_wander(self, signalData, label, frequency=0.5, amplitude=0.1, sampling_rate=500):
-        """
-        Adds baseline wander noise to the ECG signal.
-        
-        Parameters:
-        signalData: ndarray
-            Input ECG data with shape (timesteps, leads)
-        frequency: float
-            Frequency of the baseline wander (default: 0.5Hz)
-        amplitude: float
-            Amplitude of the noise
-        sampling_rate: int
-            Sampling rate of the signal
-        
-        Returns:
-        augmented_data: ndarray
-            ECG data with added baseline wander noise
-        """
-        t = np.linspace(0, signalData.shape[1] / sampling_rate, signalData.shape[1], dtype=np.float16)
-        amplitude = tf.random.uniform((), 0.05, amplitude, dtype=tf.float32)
-        noise = amplitude * np.sin(2 * np.pi * frequency * t, dtype=np.float16)
-        return signalData + noise, label  # Returns a new array
     
     @tf.function
     def add_time_warp(self, signal, label, warp_factor_range=(0.5, 1.5)):
@@ -147,7 +148,8 @@ class DataAugmenter:
         return signal, label
     
     @tf.function
-    def time_warp_crop(self, signal, label, warp_factor_range=(0.85, 1.5)):
+    def time_warp_crop(self, signal, label, warp_factor_range=(0.85, 1.15)):
+        
         """
         Applies time warping to a 12-lead ECG signal and crops instead of resizing.
 
@@ -160,59 +162,30 @@ class DataAugmenter:
         Returns:
         Warped and cropped ECG signal (same shape as input)
         """
-       
-        # Choose a strong warp factor for noticeable changes
-        warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1], dtype=tf.float16)
-        # Compute new length after warping
-        warped_timesteps = tf.cast(tf.round(tf.cast(self.timesteps, tf.float16) * warp_factor), tf.int16)
-        
-        #-------------
-        # Generate new time indices for interpolation
-        # original_indices = tf.linspace(0.0, tf.cast(timesteps - 1, tf.float32), timesteps)
-        # warped_indices = tf.linspace(0.0, tf.cast(timesteps - 1, tf.float32), warped_timesteps)
-        
-        # Interpolate each lead separately using `tf.map_fn`
-        # def interp_lead(lead_signal):
-        #     interpolation = tf.numpy_function(np.interp, [warped_indices, original_indices, lead_signal], tf.float64)
-        #     return tf.cast(interpolation, tf.float32)
-        #-------------
-        # warped_signal = tf.map_fn(interp_lead, tf.transpose(signal), dtype=tf.float32)
-        # warped_signal = tf.transpose(warped_signal)  # Convert back to (timesteps, 12)
-        signal = tf.expand_dims(signal, axis=-1)  # Shape (5000, 12, 1)
-        # Note for resize, returns dtype=float32 unless method is neareset
-        signal = tf.image.resize(signal, [warped_timesteps, self.n_leads], method="nearest") # interpolate as an img
-        signal = tf.squeeze(signal, axis=-1)  # Remove extra dim
-        
-        # # **Instead of resizing, crop to original length**
-        # if warped_timesteps > timesteps:
-        #     # If stretched, take only the first 5000 samples
-        #     signal = signal[:timesteps, :]
-        # else:
-        #     pad_size = timesteps - warped_timesteps
-        #     # Repeat the last row of the signal to fill in the padding
-        #     pad_values = signal[-1:, :]  # Get the last row
-
-        #     # Concatenate the pad values to the end of the signal
-        #     signal = tf.concat([signal, tf.repeat(pad_values, pad_size, axis=0)], axis=0)
-        #     # pad_values = tf.tile(warped_signal[-1:, :], [pad_size, 1])  # Repeat last row
-        #     # # pad_values = warped_signal[:pad_size, :]  # Copy first part of the signal
-        #     # # Repeat the first part of the signal to fill in the padding
-        #     # warped_signal = tf.concat([warped_signal, pad_values], axis=0)
-        # signal = tf.ensure_shape(signal, [timesteps, num_leads]) # tf thingy, as the variable timesteps, num:leads is a symbolic value, and this requires constant int
-
-        signal = tf.cond(
-            warped_timesteps > self.timesteps,
-            lambda: signal[:self.timesteps, :],  # Crop if too long
-            lambda: tf.concat([signal, tf.repeat(signal[-1:, :], self.timesteps - warped_timesteps, axis=0)], axis=0)
-            # lambda: tf.pad(signal, 
-            #                [[0, self.timesteps - warped_timesteps], [0, 0]], 
-            #                mode="CONSTANT", 
-            #                constant_values=signal[-1, :])  # Efficient padding
-        )
-        signal.set_shape([self.timesteps, self.n_leads])  
+        with tf.device("/GPU:0"):
+            # Choose a strong warp factor for noticeable changes
+            warp_factor = tf.random.uniform([], minval=warp_factor_range[0], maxval=warp_factor_range[1], dtype=tf.float16)
+            # Compute new length after warping
+            warped_timesteps = tf.cast(tf.round(tf.cast(self.timesteps, tf.float16) * warp_factor), tf.int16)
+            signal = tf.expand_dims(signal, axis=-1)  # Shape (5000, 12, 1)
+            # Note for resize, returns dtype=float32 unless method is neareset
+            signal = tf.image.resize(signal, [warped_timesteps, self.n_leads], method="nearest") # interpolate as an img
+            signal = tf.squeeze(signal, axis=-1)  # Remove extra dim
+            
+            signal = tf.cond(
+                warped_timesteps > self.timesteps,
+                lambda: signal[:self.timesteps, :],  # Crop if too long
+                lambda: tf.concat([signal, tf.repeat(signal[-1:, :], self.timesteps - warped_timesteps, axis=0)], axis=0)
+                # lambda: tf.pad(signal, 
+                #                [[0, self.timesteps - warped_timesteps], [0, 0]], 
+                #                mode="CONSTANT", 
+                #                constant_values=signal[-1, :])  # Efficient padding
+            )
+            signal.set_shape([self.timesteps, self.n_leads])  
         
         return signal, label    
-    def median_filter(self, signal, label, kernel_size=101):
+    @tf.function
+    def median_filter_old(self, signal, label, kernel_size=1001):
         """Apply a 1D median filter to each lead of the ECG signal.
         
         Args:
@@ -225,31 +198,112 @@ class DataAugmenter:
         # Ensure kernel size is odd
         if kernel_size % 2 == 0:
             kernel_size += 1
-        # Pad signal to handle edge effects (padding is done symmetrically)
-        pad_size = kernel_size // 2
-        padded_signal = tf.pad(signal, [[pad_size, pad_size], [0, 0]], mode="SYMMETRIC")
-        padded_signal = tf.expand_dims(padded_signal, axis=0)  # Shape (1, 5000, 12)
-        
-        
-        # Apply median filter using a sliding window
-        padded_signal = tf.map_fn(lambda lead: tf.nn.pool(
-            input=tf.expand_dims(lead, axis=0), 
-            window_shape=[kernel_size], 
-            pooling_type='AVG',  # Approximate median using average pooling
-            padding='VALID',
-            strides=[1]
-        )[0], padded_signal)  # Transpose so we apply along time
-        
-        padded_signal = tf.squeeze(padded_signal, 0)
-        # Remove baseline wander by subtracting the median-filtered signal
-        signal = signal - padded_signal
-        if self.baseline is not None:
-            # add baseline wander from previous processed signal.
-            signal = signal + self.baseline
-        # Store baseline.
-        self.baseline.assign(padded_signal)
-        return signal, label
+        with tf.device("/GPU:0"):  # Force execution on GPU
+            # Pad signal to handle edge effects (padding is done symmetrically)
+            pad_size = kernel_size // 2
+            padded_signal = tf.pad(signal, [[pad_size, pad_size], [0, 0]], mode="SYMMETRIC")
+            padded_signal = tf.expand_dims(padded_signal, axis=0)  # Shape (1, 5000, 12)
+            
+            
+            # Apply median filter using a sliding window
+            padded_signal = tf.map_fn(lambda lead: tf.nn.pool(
+                input=tf.expand_dims(lead, axis=0), 
+                window_shape=[kernel_size], 
+                pooling_type='AVG',  # Approximate median using average pooling
+                padding='VALID',
+                strides=[1]
+            )[0], padded_signal)  # Transpose so we apply along time
+            
+            padded_signal = tf.squeeze(padded_signal, 0)
+            # Remove baseline wander by subtracting the median-filtered signal
+            signal = signal - padded_signal
+            # if self.baseline is not None:
+                # add baseline wander from previous processed signal.
+                # signal = signal + self.baseline
+            # Store baseline.
+            self.baseline.assign(padded_signal)
+        return padded_signal, label
+    
+    @tf.function
+    def median_filter(self, signal, label, kernel_size=1001, addBaseline = False):
+        """Apply a 1D median filter approximation using depthwise convolution."""
+        if kernel_size % 2 == 0:
+            kernel_size += 1  # Ensure odd kernel size
 
+        with tf.device("/GPU:0"):  # Force execution on GPU
+            signal = tf.expand_dims(signal, axis=0)
+            signal = tf.expand_dims(signal, axis=-1)
+            
+            filter_weights = tf.ones([kernel_size, 1, 1,1]) /kernel_size
+
+            # Apply depthwise Conv1D (efficient for GPUs)
+            filtered_signal = tf.nn.conv2d(
+                signal,
+                filters=filter_weights,
+                strides=[1,1,1,1],
+                padding="SAME",
+                data_format="NHWC"  # (Batch, Time, Channels)
+            )
+            # filtered_signal = tf.squeeze(filtered_signal, axis=-1)  # Shape (5000, 12)
+            filtered_signal = tf.squeeze(filtered_signal, axis=0)  # Shape (5000, 12)
+            filtered_signal = tf.squeeze(filtered_signal, axis=-1)  # Shape (5000, 12)
+            signal = tf.squeeze(signal, axis=0)
+            signal = tf.squeeze(signal, axis=-1)
+            # Subtract the baseline wander
+            signal = signal - filtered_signal
+
+            if addBaseline and self.baseline is not None:
+                signal = signal + self.baseline
+
+            # Store baseline
+            self.baseline.assign(filtered_signal)
+            signal, label = self.add_gaussian_noise(signal, label)
+        return signal, label
+    
+    def selective_amplitude_scaling(self,signal,label, lead_indices=[0, 1, 2, 5, 6]):
+        # Generate random scale factors for selected leads (e.g., between 0.8 and 1.2)
+        scale_factors = tf.random.uniform(shape=[len(lead_indices)], minval=1.1, maxval=1.3)
+        
+        # Create a ones tensor (identity scaling for unselected leads)
+        scaling_tensor = tf.ones([12], dtype=tf.float32)
+        
+        # Assign random scaling values to selected leads
+        scaling_tensor = tf.tensor_scatter_nd_update(
+            scaling_tensor, 
+            indices=tf.constant([[i] for i in lead_indices], dtype=tf.int32), 
+            updates=scale_factors
+        )
+        return signal * scaling_tensor, label
+    
+    def amplitude_scaling(self, signal, label):
+        if label[2] > 0: # Only scale V1-V6 for hyp.
+            return self.selective_amplitude_scaling(signal, label)
+        factor = tf.random.normal(shape=tf.shape(signal), mean=1, stddev=0.05, dtype=tf.float32)
+  
+        return signal * factor, label
+    def host_guest_augmentation(self, signalData, label, level=5, tolerance=0.1):
+            """
+            Implementerar Host-Guest-principen för EKG-signalaugmentering.
+            """
+            # if label[2] > 0: # Gör inte augmentering på HYP?
+            #     return signalData, label
+            segment_length = self.timesteps // level
+            signal_copy = tf.identity(signalData)
+            
+            for i in range(level - 1):
+                start_idx = i * segment_length
+                end_idx = (i + 1) * segment_length
+                
+                host_segment = signalData[start_idx:end_idx, :]
+                guest_segment = signalData[end_idx:(end_idx + segment_length), :] if end_idx + segment_length < self.timesteps else signalData[:segment_length, :]
+                
+                difference = tf.abs(host_segment - guest_segment)
+                mask = difference > tolerance  # Identifiera skillnader
+                
+                modified_segment = tf.where(mask, guest_segment, host_segment)
+                signal_copy = tf.tensor_scatter_nd_update(signal_copy, tf.range(start_idx, end_idx)[:, None], modified_segment)
+            
+            return signal_copy, label
 
 
 
