@@ -49,6 +49,8 @@ if __name__ == "__main__":
                         help="L2 value (Optional)")
     parser.add_argument("--ES", type=bool, default=True,
                         help="Early Stopping, default True (Optional)")
+    parser.add_argument("--Balanced", type=bool, default=False,
+                        help="Use balanced set by over/under sampling")
     args = parser.parse_args()
 
     # Optimization settings
@@ -56,10 +58,11 @@ if __name__ == "__main__":
     batch_size = args.BS
     
     # Load data and setup sequences
+    useBalancedSet = args.Balanced
     slice = args.Slice
     buffer_size= 10000
     num_epochs = 50
-    dropout_keep_prob = 0.5
+    dropout_keep_prob = 0.3
     DA_P = 0.85
     DA2_P = 0.25
     l2_lambda = args.L2
@@ -67,7 +70,7 @@ if __name__ == "__main__":
     useEarlyStopping = args.ES
     
     dataloader = Dataloader(args.path_train_hdf5, args.path_train_csv,args.path_valid_hdf5, args.path_valid_csv, args.training_dataset_name, 
-                            args.validation_dataset_name, batch_size, buffer_size=buffer_size, DA_P=DA_P)
+                            args.validation_dataset_name, batch_size, buffer_size=buffer_size, DA_P=DA_P, useBalancedSet=useBalancedSet)
     validation_dataset = dataloader.getValidationData(sliceIdx=slice)
     if args.DA == []:
         print("Running base set")
@@ -75,6 +78,7 @@ if __name__ == "__main__":
         print(f"Running with Augmentations: {DA_methods}")
     print(f"Batchsize: {batch_size}")
     print(f"L2: {l2_lambda}")
+    print(f"Balanced: {useBalancedSet}")
     tf_dataset = dataloader.getTrainingData(DA_methods,sliceIdx=slice)
 
     loss = 'binary_crossentropy'
@@ -94,7 +98,7 @@ if __name__ == "__main__":
     log_dir = os.path.relpath("logs")  # Välj en enkel sökväg
     time_stamp = time.strftime("%Y%m%d-%H%M%S")
     os.makedirs(log_dir, exist_ok=True)
-    fileName = f"{args.final_model_name}-BS{batch_size}-LR{lr}-DRK_P{dropout_keep_prob}-DA_P{DA_P}-DA2_P{DA2_P}-L2_{l2_lambda}-ES_{useEarlyStopping}-{time_stamp}"
+    fileName = f"{args.final_model_name}-BS{batch_size}-LR{lr}-DRK_P{dropout_keep_prob}-DA_P{DA_P}-DA2_P{DA2_P}-L2_{l2_lambda}-ES_{useEarlyStopping}-Balanced_{useBalancedSet}-{time_stamp}"
     log_dir = os.path.join(log_dir, f"{fileName}")
 
     # Callbacks
@@ -119,7 +123,7 @@ if __name__ == "__main__":
     print("Start training")
     # steps_per_epoch = (slice) // batch_size # Use this when testing with slice.
     # steps_per_epoch = len(trainAnnotationData) // batch_size
-    steps_per_epoch = 2*dataloader.datasetLength // batch_size
+    steps_per_epoch = dataloader.datasetLength // batch_size
     # dir_newmodels = os.path.relpath("new_models")
     # os.makedirs(dir_newmodels, exist_ok=True)
     # dir_newmodels = os.path.join(dir_newmodels, f"{fileName}")
