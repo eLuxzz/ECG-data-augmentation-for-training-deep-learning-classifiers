@@ -26,7 +26,7 @@ class DataAugmenter:
         gaussian_noise = tf.random.normal(shape=tf.shape(signalData), mean=mean, stddev=std, dtype=tf.float32)
         return signalData + gaussian_noise, label
     
-    def add_powerline_noise(self, signalData,label, frequency=50, amplitude=0.15, sampling_rate=500):
+    def add_powerline_noise(self, signalData,label, frequency=50, amplitude=0.01, sampling_rate=500):
         """
         Adds sinusoidal powerline noise to the ECG signal.
         
@@ -44,7 +44,7 @@ class DataAugmenter:
         augmented_data: ndarray
             ECG data with added powerline noise
         """
-        amplitude = tf.random.uniform((), 0.05, amplitude, dtype=tf.float32)
+        amplitude = tf.random.uniform((), 0.003, amplitude, dtype=tf.float32)
         t = np.linspace(0, signalData.shape[1] / sampling_rate, signalData.shape[1], dtype=np.float16)
         powerline_noise = amplitude * np.sin(2 * np.pi * frequency * t, dtype=np.float16)
 
@@ -225,7 +225,7 @@ class DataAugmenter:
         return padded_signal, label
     
     @tf.function
-    def median_filter(self, signal, label, kernel_size=1001, addBaseline = False):
+    def median_filter(self, signal, label, kernel_size=1001, addBaseline = True):
         """Apply a 1D median filter approximation using depthwise convolution."""
         if kernel_size % 2 == 0:
             kernel_size += 1  # Ensure odd kernel size
@@ -262,7 +262,7 @@ class DataAugmenter:
     
     def selective_amplitude_scaling(self,signal,label, lead_indices=[0, 1, 2, 5, 6]):
         # Generate random scale factors for selected leads (e.g., between 0.8 and 1.2)
-        scale_factors = tf.random.uniform(shape=[len(lead_indices)], minval=1.1, maxval=1.3)
+        scale_factors = tf.random.uniform(shape=[len(lead_indices)], minval=0.8, maxval=1.2)
         
         # Create a ones tensor (identity scaling for unselected leads)
         scaling_tensor = tf.ones([12], dtype=tf.float32)
@@ -276,7 +276,7 @@ class DataAugmenter:
         return signal * scaling_tensor, label
     
     def amplitude_scaling(self, signal, label):
-        if label[2] > 0: # Only scale V1-V6 for hyp.
+        if label[2] > 0.5: # Only scale V1-V6 for hyp.
             return self.selective_amplitude_scaling(signal, label)
         factor = tf.random.normal(shape=tf.shape(signal), mean=1, stddev=0.05, dtype=tf.float32)
   
