@@ -10,6 +10,7 @@ import seaborn as sns
 import argparse
 import os
 import xarray as xr
+from predict import makePrediction
 
 # %% Auxiliar functions
 def get_scores(y_true, y_pred, score_fun):
@@ -343,12 +344,14 @@ def Boxplot():
 
 
 parser = argparse.ArgumentParser(description='Evaluate Prediction by F1 score.')
+parser.add_argument('path_test_hdf5', type=str,
+                    help='path to hdf5 file containing test set')
 parser.add_argument('path_test_csv', type=str,
                     help='path to csv file containing annotations')
 parser.add_argument('output_folder_path', type=str,
                     help='path to output folder')
-parser.add_argument('path_predict_npy', type=str,
-                    help='path to npy file containing predictions')
+parser.add_argument('path_to_model', type=str,
+                    help='path to model')
 args = parser.parse_args()
 # %% Constants
 score_fun = {'Precision': precision_score,
@@ -357,8 +360,9 @@ score_fun = {'Precision': precision_score,
 diagnosis = ['NORM', 'CD', 'HYP', 'MI', 'STTC']
 nclasses = len(diagnosis)
 predictor_names = ['DNN']
-fileName = args.path_predict_npy.split("/")[-1]
-fileName = str.removesuffix(fileName, ".npy")
+
+fileName = args.path_to_model.split("/")[-1]
+fileName = str.removesuffix(fileName, ".keras")
 output_path = os.path.join(args.output_folder_path, fileName)
 os.makedirs(f"{output_path}/tables",exist_ok=True)
 os.makedirs(f"{output_path}/figures",exist_ok=True)
@@ -369,7 +373,7 @@ os.makedirs(f"{output_path}/figures",exist_ok=True)
 y_true_raw =  pd.read_csv(args.path_test_csv).values
 
 # get y_score (soft labels, probability)
-y_score_best = np.load(args.path_predict_npy)
+y_score_best = makePrediction(args.path_to_model, args.path_test_hdf5, "tracings")
 
 
 # %% Binarize the soft labels
@@ -404,4 +408,4 @@ scores_list = []
 Scores()
 PRCurve()
 ConfusionMatrix()
-Boxplot()
+# Boxplot()
