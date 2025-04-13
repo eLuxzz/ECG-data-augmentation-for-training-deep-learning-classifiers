@@ -262,7 +262,7 @@ class DataAugmenter:
     
     def selective_amplitude_scaling(self,signal,label, lead_indices=[0, 1, 2, 5, 6]):
         # Generate random scale factors for selected leads (e.g., between 0.8 and 1.2)
-        scale_factors = tf.random.uniform(shape=[len(lead_indices)], minval=0.8, maxval=1.2)
+        scale_factors = tf.random.normal(shape=[len(lead_indices)], mean=1, stddev=0.05, dtype=tf.float32)
         
         # Create a ones tensor (identity scaling for unselected leads)
         scaling_tensor = tf.ones([12], dtype=tf.float32)
@@ -273,13 +273,13 @@ class DataAugmenter:
             indices=tf.constant([[i] for i in lead_indices], dtype=tf.int32), 
             updates=scale_factors
         )
+        print(scaling_tensor)
         return signal * scaling_tensor, label
     
     def amplitude_scaling(self, signal, label):
         if label[2] > 0.5: # Only scale V1-V6 for hyp.
             return self.selective_amplitude_scaling(signal, label)
-        factor = tf.random.normal(shape=tf.shape(signal), mean=1, stddev=0.05, dtype=tf.float32)
-  
+        factor = tf.random.normal(shape=(1,12), mean=1, stddev=0.05, dtype=tf.float32)
         return signal * factor, label
     def host_guest_augmentation(self, signalData, label, level=5, tolerance=0.1):
             """
