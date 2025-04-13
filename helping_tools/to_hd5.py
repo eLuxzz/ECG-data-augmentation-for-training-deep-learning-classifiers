@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 # Paths
 
-records_start_path = "C:/Users/amjad/Downloads/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/" #ÄNDRA ÄNDRA 
+records_start_path = "/mnt/d/Studierelaterat/KEX-Lokalt/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/"
 path_record_train = "data/PTB_XL_data/RECORDS_TRAIN.txt"  # Path to the record list
 path_record_test = "data/PTB_XL_data/RECORDS_TEST.txt"
 path_record_valid = "data/PTB_XL_data/RECORDS_VALID.txt"
