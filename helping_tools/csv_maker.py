@@ -1,6 +1,7 @@
 import pandas as pd
 import ast
 import csv
+import numpy as np
 
 df = pd.read_csv('data/PTB_XL_data/ptbxl_database.csv')
 train_data= []
@@ -9,23 +10,22 @@ val_data= []
 line = 0
 
 CD = {
-    "LAFB", "LPFB", "IRBBB", "ILBBB", "CLBBB", "CRBBB", "AVB", "IVCD", "WPW", "3AVB", "2AVB"
+    "LAFB", "IRBBB", "1AVB", "IVCD", "CRBBB", "CLBBB", "LPFB", "WPW", "ILBBB", "3AVB", "2AVB"
 }
 
 HYP = {
-    "LVH", "RVH", "LAO/LAE", "RAO/RAE", "SEHYP"
+    "LVH", "LAO/LAE", "RVH", "RAO/RAE", "SEHYP"
 }
 
 MI = {
-    "AMI", "IMI", "LMI", "PMI", "ALMI", "ASMI", "ILMI", "INJAS", 
-    "INJAL", "INJIL", "INJIN", "INJLA", "IPMI", "IPMLI"
+    "IMI", "ASMI", "ILMI", "AMI", "ALMI", "INJAS", "LMI",
+    "INJAL", "IPLMI", "IPMI", "INJIN", "INJLA", "PMI", "INJIL"
 }
 
 STTC = {
-    "ISCAS", "ISCI", "ISC_", "ISCL", "ISCIL", "ISCIN", "ISCAL", "ISCLA", "ISCAN", 
-    "ANEUR", "NST_", "NDT", "DIG", "LNGQT", "EL"
+    "NDT", "NST_", "DIG", "LNGQT", "ISC_", "ISCAL", 
+    "ISCIN", "ISCIL", "ISCAS", "ISCLA","ANEUR", "EL", "ISCAN", 
 }
-
 NORM = {
     "NORM"
 }
@@ -68,7 +68,7 @@ for i in df['scp_codes']:
     # Removed ecg_id temporarily from csv file.
     #data_dict["id"] = df["ecg_id"][line]
     if not common:
-        ides.append(df["ecg_id"][line])
+        ides.append(int(df["ecg_id"][line]))
     else:
         if df["strat_fold"][line] == 9:
             val_data.append(data_dict)
@@ -80,6 +80,7 @@ for i in df['scp_codes']:
     line += 1
     common = False
 
+# print(len(ides))
 with open('data/PTB_XL_data/validation_data.csv', 'w', newline='') as csvfile:
     writer = csv.DictWriter(csvfile, fieldnames=SUPER_CLASSES)
     writer.writeheader()
