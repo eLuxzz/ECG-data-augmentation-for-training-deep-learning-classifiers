@@ -1,10 +1,14 @@
 import numpy as np
 import tensorflow as tf
+import pandas as pd
+import random
 class DataAugmenter:
     def __init__(self, timesteps = 5000, leads=12):
         self.timesteps = timesteps
         self.n_leads = leads
         self.baseline = tf.Variable(tf.zeros((5000, 12)), trainable=False)
+        self.all_generated_arrays = []
+        self.arrays = {} 
         pass
     @tf.function
     def add_gaussian_noise(self, signalData,label, mean=0, std=0.007):
@@ -23,6 +27,7 @@ class DataAugmenter:
         augmented_data: ndarray
             ECG data with added Gaussian noise
         """
+        std = tf.random.uniform((), 0.005, 0.008)
         gaussian_noise = tf.random.normal(shape=tf.shape(signalData), mean=mean, stddev=std, dtype=tf.float32)
         return signalData + gaussian_noise, label
     
@@ -277,33 +282,315 @@ class DataAugmenter:
         return signal * scaling_tensor, label
     
     def amplitude_scaling(self, signal, label):
-        if label[2] > 0.5: # Only scale V1-V6 for hyp.
-            return self.selective_amplitude_scaling(signal, label)
+        # if label[2] > 0.5: # Only scale V1-V6 for hyp.
+        #     return self.selective_amplitude_scaling(signal, label)
         factor = tf.random.normal(shape=(1,12), mean=1, stddev=0.05, dtype=tf.float32)
         return signal * factor, label
-    def host_guest_augmentation(self, signalData, label, level=5, tolerance=0.1):
-            """
-            Implementerar Host-Guest-principen för EKG-signalaugmentering.
-            """
-            # if label[2] > 0: # Gör inte augmentering på HYP?
-            #     return signalData, label
-            segment_length = self.timesteps // level
-            signal_copy = tf.identity(signalData)
+    @tf.function
+    def hga_kent(self, signal, label, segments = 3, activity_threshold=0.1, window_size=400):
+        """
+        Applies Host-Guest Augmentation to the ECG signal.
+
+        Parameters:
+        signal: Tensor of shape (timesteps, 12)
+            Input ECG signal (expected shape: (5000, 12))
+        label: Tensor
+            Corresponding label.
+        segments: int
+            Number of segments to divide the signal into.
+        activity_threshold: float
+            Threshold for low activity to determine cut points.
+        window_size: int
+            Size of the window around the segment boundary to search for low-activity points.
+
+        Returns:
+        Augmented ECG signal (same shape as input) and label.
+        """
+        with tf.device("/GPU:0"):
+            # Calculate approximate segment length
+            segment_length = self.timesteps // segments
             
-            for i in range(level - 1):
-                start_idx = i * segment_length
-                end_idx = (i + 1) * segment_length
-                
-                host_segment = signalData[start_idx:end_idx, :]
-                guest_segment = signalData[end_idx:(end_idx + segment_length), :] if end_idx + segment_length < self.timesteps else signalData[:segment_length, :]
-                
-                difference = tf.abs(host_segment - guest_segment)
-                mask = difference > tolerance  # Identifiera skillnader
-                
-                modified_segment = tf.where(mask, guest_segment, host_segment)
-                signal_copy = tf.tensor_scatter_nd_update(signal_copy, tf.range(start_idx, end_idx)[:, None], modified_segment)
+            # Initialize a list to store the segments
+            segments_list = []
+            previous_end = 0
             
-            return signal_copy, label
+            for segment in range(segments):
+                # Define the start and end of the search window
+                start_idx = previous_end
+                end_idx = start_idx + segment_length + window_size//2
+                # end_idx = tf.reduce_min((self.timesteps, start_idx + segment_length + window_size//2))
+                # tf.print("Start: ", start_idx, "End: ", end_idx)
+
+                if segment == segments-1 or end_idx >= self.timesteps:
+                    end_idx = self.timesteps
+                else:
+                    # Find the index within the window where activity is lowest
+                    window = signal[end_idx - window_size:end_idx]
+                    activity_levels = tf.reduce_mean(tf.abs(window), axis=1)  # Compute activity for each timestep
+                    previous_end = end_idx = tf.argmin(activity_levels, output_type=tf.dtypes.int32) + end_idx - window_size
+                # tf.print("After argmin: ", end_idx)
+                # Extract the segment
+                segments_list.append(signal[start_idx:end_idx])
+
+            #%% A ugly code that works around tf shape issues with concat
+            range_values = tf.range(segments)
+            range_values = tf.random.shuffle(range_values)
+            new_signal = tf.zeros((0,12)) # instantiation of new_signal
+            for i in range(segments):
+                if i == range_values[0]:
+                    new_signal = segments_list[i] # Always set
+                    
+            for j in range_values[1:]:
+                for i in range(segments):
+                    if i == j:
+                        new_signal = tf.concat([new_signal, segments_list[i]], axis=0)
+                
+            new_signal.set_shape([self.timesteps, self.n_leads])
+        return new_signal, label
+
+        #%% An attempt to use proper tf code to concat the segments
+
+        # range_values = list(range(3))
+        # segments_tensor = tf.stack(segments_list) # Shape (3, 5000, 12)
+        # range_values = tf.range(3)
+        # # Shuffle the range
+        # range_values = tf.random.shuffle(range_values)
+        # shuffled_segments = tf.gather(segments_tensor, range_values, axis=0)
+        # new_signal = shuffled_segments[0]
+        # for i in range(1, len(shuffled_segments)):
+        #     new_signal = tf.concat([new_signal, shuffled_segments[i]], axis=0)
+        # new_signal.set_shape([self.timesteps, self.n_leads])
+        # tf.print("Signal", tf.shape(new_signal))
+        # return new_signal, label
+
+    
+    def Host_Guest_ECG_Augmentation_12_Leads(self, data,file_path,Lead_No,Level,threshold):  
+        df = pd.DataFrame(columns=['Segment', 'Start', 'End'])
+        split_value = round(len(data) / Level, ) #divide the ECG signal array into equal length of the level
+
+        start = 0
+        end = split_value  
+
+        row = 0
+        div_Segment = 1    #segment index starts from 1 i.e. not from 0
+
+        #making the dataframe with start and end value of each segment
+        for i in range(1, Level + 1):
+            df.loc[row, 'Segment'] = round(div_Segment, )
+            df.loc[row, 'Start'] = start
+            df.loc[row, 'End'] = end
+
+            start = (end+1)
+            end += split_value
+
+            if end > len(data):
+                end = len(data)
+            div_Segment+=1
+            row+=1
+
+        My_original_dataframe=df  #making copy of the dataframe
+        current = 0 #the current dealing index of dataframe
+        original_df = df.index.tolist()
+        Max_Original_df_index=max(original_df)
+
+        #starting a loop on dataframe index wise to decide about the Host/Guest segment in each segment give in dataframe
+        for ind in df.index:
+        
+            # check if segment division is given 2 by the user then do not execute i.e. no segment shuffling is possible here
+            if len(original_df)== 2 and max(original_df) == ind:
+                
+                do_not_execute=1
+
+            elif max(original_df) == ind and len(original_df)>2:
+
+                Start_value = df.iloc[ind]['Start']
+                End_value = df.iloc[ind]['End']
+
+                Guest_B = current
+                Host_B = min(original_df)
+                
+                Host_A="Null"
+                Guest_A="Null"
+                
+                idx = df.index.tolist()
+                idx.pop(current)
+                df = df.reindex([current] + idx)
+
+                #calling modified tolerance method for pruning and joing segments
+                self.Modified_measure_tolerance(df.index.tolist(),data,file_path,current,ind,Lead_No,Max_Original_df_index,
+                                        Start_value,End_value,Guest_B,Host_B,Guest_A,Host_A,My_original_dataframe,threshold)
+
+                #organizing the sequence when one segment is shuffled and stored in array for final step
+                df = df.reindex(original_df)
+                
+            
+            else:
+                Start_value = df.iloc[ind]['Start']
+                End_value = df.iloc[ind]['End']
+                
+                Guest_B = current
+                Host_B = max(original_df)
+                
+                
+                Host_A = (current - 1)
+                Guest_A = (current + 1)
+                
+                if current == min(original_df) or current == max(original_df):
+                    Host_A="Null"
+                    Guest_A="Null"
+                    
+                idx = df.index.tolist()
+                idx.pop(current)
+                df = df.reindex(idx + [current])
+                
+                self.Modified_measure_tolerance(df.index.tolist(),data,file_path,current,ind,Lead_No,Max_Original_df_index,
+                                        Start_value,End_value,Guest_B,Host_B,Guest_A,Host_A,My_original_dataframe,threshold)
+
+                df = df.reindex(original_df)
+                current += 1
+
+    #Method for pruning the Host segment and re-joing        
+    def Segment_Pruning(self, host_val, guest_val, My_original_dataframe, ind, threshold_value, dataframe_index_array,
+                        my_final_numpy_array, Host_array, Host, Triggered_From_Which_Host):
+        
+        segments_shuffle_ready = 0
+        delta_threshold = round((0.50*threshold_value),)
+        tf.autograph.experimental.set_loop_options(
+                shape_invariants=[(my_final_numpy_array, tf.TensorShape([None]))]
+            )
+        while segments_shuffle_ready == 0:
+
+                    #calculating the mean difference between host/guest segment based on threshold_values and join if it is higher i.e. >= 1
+                    #error = np.mean( host_val != guest_val )
+                    some_arr = host_val != guest_val
+                    some_arr = tf.cast(some_arr, tf.float32)
+   
+                    error =  tf.reduce_mean(some_arr)
+                    if error >=  1.0:
+                        Last_Segment_Ended_On = My_original_dataframe['End'][ind]
+                        last_index = ind
+                        segments_shuffle_ready=1
+                        threshold_value=-(threshold_value)
+                        
+                        if Host == min (dataframe_index_array) and Triggered_From_Which_Host == "B":
+
+                            my_final_numpy_array =tf.concat((my_final_numpy_array, Host_array[-(threshold_value):]), axis=-1)
+
+                        else: 
+                            my_final_numpy_array = tf.concat((my_final_numpy_array, Host_array[:threshold_value]), axis=-1)
+
+                    elif  Host == min (dataframe_index_array) and Triggered_From_Which_Host == "A":
+                            
+                            Host_array=Host_array[delta_threshold:]
+                            host_val=Host_array[:threshold_value]
+                            segments_shuffle_ready=0
+
+                    else: 
+
+                        Host_array=Host_array[:-delta_threshold]
+                        host_val=Host_array[-threshold_value:]
+
+                        ###host_val=Host_array[-(threshold_value+round((0.50*threshold_value),)):-(delta_threshold)]
+                        #########threshold_value=threshold_value+round((0.50*threshold_value),)
+
+                        segments_shuffle_ready=0
+        
+        return my_final_numpy_array
+                
+    def Modified_measure_tolerance(self, dataframe_index_array, ecg_array, ecg_file_path, current, func_ind, Lead_No, Max_Original_df_index,
+                                Start_value, End_value, Guest_B, Host_B, Guest_A, Host_A, My_original_dataframe, threshold):
+        
+        # Calculate threshold value for digit points
+        total_length_of_the_segment = (End_value - Start_value)
+        threshold_value = round((1 / threshold) * total_length_of_the_segment)
+
+        # Initialize Host/Guest segments for Scenario A (if applicable)
+        if Guest_A != "Null" and Host_A != "Null":
+            Guest_A_array = ecg_array[My_original_dataframe.iloc[Guest_A]['Start']:My_original_dataframe.iloc[Guest_A]['End']]
+            Host_A_array = ecg_array[My_original_dataframe.iloc[Host_A]['Start']:My_original_dataframe.iloc[Host_A]['End']]
+            host_A_val = Host_A_array[-(threshold_value):]
+            guest_A_val = Guest_A_array[:threshold_value]
+
+        # Initialize Host/Guest segments for Scenario B
+        Guest_array = ecg_array[My_original_dataframe.iloc[Guest_B]['Start']:My_original_dataframe.iloc[Guest_B]['End']]
+        Host_array = ecg_array[My_original_dataframe.iloc[Host_B]['Start']:My_original_dataframe.iloc[Host_B]['End']]
+        host_val = Host_array[-(threshold_value):]
+        guest_val = Guest_array[:threshold_value]
+
+        # Initialize variables for segment processing
+        last_index = -1
+        Is_First_index = 1
+        my_final_numpy_array = []
+        Last_Segment_Ended_On = 0
+        segments_shuffle_ready = 0
+
+        # Process each segment in dataframe_index_array
+        for ind in dataframe_index_array:
+            if Is_First_index == 1 and Host_A == "Null":
+                my_final_numpy_array = tf.concat((my_final_numpy_array, ecg_array[My_original_dataframe['Start'][ind]:My_original_dataframe['End'][ind]]), axis=-1)
+                Is_First_index = 0
+                Last_Segment_Ended_On = My_original_dataframe['End'][ind]
+                last_index = ind
+            
+            elif ind == Host_A:
+                my_final_numpy_array = self.Segment_Pruning(host_A_val, guest_A_val, My_original_dataframe, ind, 
+                                                threshold_value, dataframe_index_array, my_final_numpy_array, 
+                                                Host_A_array, Host_A, "A")
+            elif ind == Host_B:
+                my_final_numpy_array = self.Segment_Pruning(host_val, guest_val, My_original_dataframe, ind, 
+                                                threshold_value, dataframe_index_array, my_final_numpy_array, 
+                                                Host_array, Host_B, "B")
+            else:
+                my_final_numpy_array = tf.concat((my_final_numpy_array, ecg_array[My_original_dataframe['Start'][ind]:My_original_dataframe['End'][ind]]), axis=-1)
+                Last_Segment_Ended_On = My_original_dataframe['End'][ind]
+                last_index = ind
+
+    # Dictionary to store tensors for each func_ind
+
+
+        if func_ind in self.arrays:
+            ij=0
+
+            for ii in my_final_numpy_array:
+                self.arrays[func_ind]= tf.tensor_scatter_nd_update(self.arrays[func_ind], [[ij, Lead_No]], [ii])
+                ij=ij+1
+            my_final_numpy_array = []
+        else:
+            shape = (5000, 12)
+            self.arrays[func_ind]= tf.zeros(shape)
+            
+            ij=0
+            for ii in my_final_numpy_array:
+                self.arrays[func_ind]= tf.tensor_scatter_nd_update(self.arrays[func_ind], [[ij, Lead_No]], [ii])
+                #arrays[func_ind][ij][Lead_No]=ii
+                ij=ij+1
+            my_final_numpy_array = []
+
+        #when all leads are finished starting from index 0 to 11 then store in a numpy file for futher ECG graph plotting.
+        if Lead_No == 11: 
+
+            myarray=self.arrays[func_ind]
+            
+            self.all_generated_arrays.append(myarray)
+            my_final_numpy_array = []
+            del self.arrays[func_ind]  #making the dynamic array null for next ecg signal
+
+    def HGA(self, signal, label):
+
+        #Required variables
+        file = ""
+        No_of_leads=12
+        Level=2 #defines how many sample needs to be create from one original sample i.e., when 3 is given it will create 3 new from each original signal (Level must be greater than 2)
+        threshold=100 #indicate the cutoff value to acquire the datapoints from host/guest segment 
+
+
+
+        for Lead in range (0, No_of_leads,1): #initiating 12 times loop on variable x to extract lead/column wise data (which then passed to Host_Guest_ECG_Augmentation_12_Leads method)
+            n=signal[:,Lead]
+            # n=np.array(n).flatten()
+            self.Host_Guest_ECG_Augmentation_12_Leads(n,file,Lead,Level,threshold)
+        #print(self.all_generated_arrays[0])
+        return self.all_generated_arrays[0], label
 
 
 
