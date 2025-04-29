@@ -11,6 +11,6 @@ class UpdateDA(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.dataloader.update_DAMethod_index()
         self.dataloader.current_epoch = epoch
-    # def on_batch_end(self, epoch, logs=None):
-    #     self.dataloader.update_DAMethod_index()
-    #     # self.dataloader.current_epoch = epoch
+    def on_batch_end(self, epoch, logs=None):
+        self.dataloader.update_DAMethod_index()
+        # self.dataloader.current_epoch = epoch
