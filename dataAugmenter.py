@@ -173,8 +173,9 @@ class DataAugmenter:
         factor = tf.random.normal(shape=(1,12), mean=1, stddev=0.05, dtype=tf.float32)
         return signal * factor, label
     
-    @tf.function
-    def hga_kent(self, signal, label, segments=4, window_size=200):
+
+    @tf.function    
+    def hga(self, signal, label, segments = 3, window_size=200):
         """
         Applies Host-Guest Augmentation to the ECG signal.
 
@@ -187,7 +188,6 @@ class DataAugmenter:
             Number of segments to divide the signal into.
         window_size: int
             Size of the window around the segment boundary to search for low-activity points.
-
         Returns:
         Augmented ECG signal (same shape as input) and label.
         """
@@ -203,7 +203,6 @@ class DataAugmenter:
                 # Define the start and end of the search window
                 start_idx = previous_end
                 end_idx = start_idx + segment_length + window_size//2
-                # end_idx = tf.reduce_min((self.timesteps, start_idx + segment_length + window_size//2))
                 # tf.print("Start: ", start_idx, "End: ", end_idx)
                 if segment == segments-1 or end_idx >= self.timesteps:
                     end_idx = self.timesteps
@@ -216,47 +215,10 @@ class DataAugmenter:
                 # tf.print("After argmin: ", end_idx)
                 # Extract the segment
                 segments_list.append(signal[start_idx:end_idx])
-            #%% Ev ta average på ett fönster av 100 och lägg till medel på hela segmentet för att matcha ihop ändarna
-            # # Adjust the segments to match start and endpoints
-            # # Define a window size for averaging
-            # # Calculate the average of the last `window_size` points of the current segment
-            # end_avg = tf.reduce_mean(segments_list[prev_index][-window_size:], axis=0)
-            # # Calculate the average of the first `window_size` points of the next segment
-            # start_avg = tf.reduce_mean(segments_list[i][:window_size], axis=0)
-            # # Compute the adjustment needed to align the segments
-            # adjustment = prev_avg - start_avg
-            
-            # # Adjust the next segment to align with the current segment
-            # segments_list[i] += adjustment
-                        
-            # window_size = 100
-            #%% A ugly code that works around tf shape issues with concat
-            range_values = tf.range(segments)
-            range_values = tf.random.shuffle(range_values)
-            new_signal = tf.zeros((0,12)) # instantiation of new_signal
-            for i in range(segments):
-                if i == range_values[0]:
-                    new_signal = segments_list[i] # Always set
-            for j in range_values[1:]:
-                for i in range(segments):
-                    if i == j:
-                        new_signal = tf.concat([new_signal, segments_list[i]], axis=0)
-                
-            new_signal.set_shape([self.timesteps, self.n_leads])
-        return new_signal, label
-       
-        #%% An attempt to use proper tf code to concat the segments
-
-        # range_values = list(range(3))
-        # segments_tensor = tf.stack(segments_list) # Shape (3, 5000, 12)
-        # range_values = tf.range(3)
-        # # Shuffle the range
-        # range_values = tf.random.shuffle(range_values)
-        # shuffled_segments = tf.gather(segments_tensor, range_values, axis=0)
-        # new_signal = shuffled_segments[0]
-        # for i in range(1, len(shuffled_segments)):
-        #     new_signal = tf.concat([new_signal, shuffled_segments[i]], axis=0)
-        # new_signal.set_shape([self.timesteps, self.n_leads])
-        # tf.print("Signal", tf.shape(new_signal))
-
-        # return new_signal, label
+                # Shuffle the segments
+            indices = tf.random.shuffle(tf.range(segments))
+            ragged_tensor = tf.ragged.stack(segments_list) # Another tensor type for holding different shapes
+            shuffled_segments = tf.gather(ragged_tensor, indices)
+            newsignal = tf.concat(shuffled_segments, axis=0)
+            newsignal = tf.reshape(newsignal, (self.timesteps, self.n_leads))
+            return newsignal, label
