@@ -63,7 +63,7 @@ if __name__ == "__main__":
     buffer_size= 10000
     num_epochs = 50
     dropout_keep_prob = 0.3
-    DA_P = 0.85
+    DA_P = 1
     DA2_P = 0.25
     l2_lambda = args.L2
     DA_methods = args.DA

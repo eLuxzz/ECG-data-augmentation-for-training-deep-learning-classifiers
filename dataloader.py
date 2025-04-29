@@ -58,7 +58,7 @@ class Dataloader():
         # balanced_idx = self.get_balanced_indices(labels_training) if self.UseBalancedSet is True else None
         
         n_balancedIdx = self.datasetLength = len(balanced_idx if self.UseBalancedSet is True else labels_training)
-        if self.UseBalancedSet:
+        if self.UseBalancedSet: # Prints for dataset distribution
             print(len(labels_training),len(balanced_idx))
             org_samples = []
             for k in range(5):
@@ -76,14 +76,18 @@ class Dataloader():
         chunk_size = n_balancedIdx // 5
         print(n_balancedIdx)
         def dataset_generator():
-            if not self.UseBalancedSet:
-                print("Using default dataset")
+            if sliceIdx:
                 for i in range(n_balancedIdx if sliceIdx is None else sliceIdx):
-                        yield signal_training[i], labels_training[i]
+                    yield signal_training[i], labels_training[i]
             else:
-                if sliceIdx:
-                    for i in range(n_balancedIdx if sliceIdx is None else sliceIdx):
+                if not self.UseBalancedSet:
+                    print("Using default dataset")
+                    i = 0
+                    while True:
                         yield signal_training[i], labels_training[i]
+                        i += 1
+                        if i >= n_balancedIdx:
+                            i = 0 
                 else:
                     print("Using balanced dataset")
                     i = 0
@@ -92,17 +96,8 @@ class Dataloader():
                         idx = balanced_idx[i]
                         yield signal_training[idx], labels_training[idx]
                         i += 1
-                        # indices_chunk = balanced_idx[i:end_idx]
-                        # signal_chunk = signal_training[indices_chunk]
-                        # labels_chunk = labels_training[indices_chunk]
-                        
-                        # for idx in range(end_idx-i):
-                        #     yield signal_chunk[idx], labels_chunk[idx]
-                        # i += chunk_size
-                        # end_idx = min(i + chunk_size, n_balancedIdx)
                         if i >= n_balancedIdx:
                             i = 0 
-                        #     end_idx = min(i + chunk_size, n_balancedIdx)    
                         
               
         # Wrap the generator in tf.data.Dataset
@@ -123,7 +118,7 @@ class Dataloader():
             self.DA_index.assign(index) # tf.variable so updates are seen when running in graph mode w map() func
             # print(f"\n Selected DA method: {self.DA_Methods[index]}")
     
-    def get_balanced_indices(self, labels, confidence_threshold=0.3, other_threshold=1):
+    def get_balanced_indices(self, labels, confidence_threshold=0.8, other_threshold=0.35):
         y_classes = np.argmax(labels, axis=1)
 
         # ---- 1. Downsample NORM (class 0) ----
@@ -133,11 +128,11 @@ class Dataloader():
 
         # ---- 2. Confident HYP Samples (class 2) ----
         hyp_mask = (labels[:, 2] >= confidence_threshold) & \
-                (labels[:, [4]] <= other_threshold).all(axis=1)
+                (labels[:, [0,1,3,4]] <= other_threshold).all(axis=1)
         confident_hyp_indices = np.where(hyp_mask)[0]
         print(f"After filter: {len(confident_hyp_indices)}")
         # If confident HYP is fewer than target, oversample from them
-        target_hyp = 2500
+        target_hyp = 1500
         current_hyp = len(confident_hyp_indices)
 
         if current_hyp < target_hyp:
@@ -198,7 +193,7 @@ class Dataloader():
 
         # Define custom sampling strategy (only oversample HYP)
         sampling_strategy = {cls: count for cls, count in zip(*np.unique(y_classes, return_counts=True))}
-        # sampling_strategy[1] = TARGET_CD_SAMPLES  # Set CD target
+        sampling_strategy[1] = TARGET_CD_SAMPLES  # Set CD target
         sampling_strategy[2] = TARGET_HYP_SAMPLES  # Set HYP target
 
         ros = RandomOverSampler(sampling_strategy=sampling_strategy)
@@ -222,8 +217,9 @@ class Dataloader():
         def apply_augmentation(x, y):  # Tensorflow runs this in graph mode and only trace it once. Any changes in variables won't be seen, unless it is an tf.Variable
             if len_DAMethods == 0:
                 return x,y
+            # if y[2] > 0 or tf.random.uniform((), seed=42, dtype=tf.float16) < self.DA_P:  # Randomly apply augmentations
             if tf.random.uniform((), seed=42, dtype=tf.float16) < self.DA_P:  # Randomly apply augmentations
-                index = self.DA_index.read_value()  # Correct way to read tf.Variable in graph mode
+                index = self.DA_index.read_value()
                 for i in range(0, len_DAMethods):
                     if index != i:
                         continue
@@ -271,12 +267,12 @@ class Dataloader():
         def apply_augmentation(x, y):
             for aug in DAMethods:
                 func = getattr(self._DA, aug)
-                if func and tf.random.uniform((), dtype=tf.float16) < self.DA_P:  # Randomly apply augmentations
+                if func:  # Randomly apply augmentations
                     x, y = func(x, y)
             return x, y
         
 
-        # Followihng Epochs: DA   
+        # Following Epochs: DA   
         dataset = dataset.map(apply_augmentation, num_parallel_calls=tf.data.AUTOTUNE)\
             .batch(self.batch_size) \
             .prefetch(tf.data.AUTOTUNE) 
