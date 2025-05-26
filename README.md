@@ -26,7 +26,7 @@ The model used in the paper is a residual neural. The neural network architectur
 $ python model.py
 ```
 
-![resnet](https://media.springernature.com/full/springer-static/image/art%3A10.1038%2Fs41467-020-15432-4/MediaObjects/41467_2020_15432_Fig3_HTML.png?as=webp)
+![Model Diagram](img/dnn_model.png)
 
 The model receives an input tensor with dimension `(N, 5000, 12)`, and returns an output tensor with dimension `(N, 5)`,
 for which `N` is the batch size.
@@ -42,8 +42,6 @@ tensor contains points of the 12 different leads. The leads are ordered in the f
 - **output**: `shape = (N, 5)`. Each entry contains a probability between 0 and 1, and can be understood as the
 probability of a given abnormality to be present. The abnormalities it predicts are  **(in that order)**: (NORM), (CD), (HYP), (MI), (STTC). The abnormalities are not mutually exclusive, so the probabilities do not necessarily
 sum to one.
-
-![abnormalities](https://media.springernature.com/full/springer-static/image/art%3A10.1038%2Fs41467-020-15432-4/MediaObjects/41467_2020_15432_Fig1_HTML.png?as=webp)
 
 ## Datasets
 The dataset used in the paper is from PTB-XL, a large publicly available electrocardiography dataset, 
