@@ -341,7 +341,24 @@ def Boxplot():
 
     scores_resampled_xr.to_dataframe(name='score').to_csv(f'{output_path}/figures/boxplot_bootstrap_data.txt')
     print("Boxplot complete")
+def analyze_prediction_overlap(y_true, y_pred):
+    hyp_true = y_true[:, 2]
+    hyp_pred = y_pred[:, 2]
 
+    print("Överlapp mellan HYP och andra klasser (när HYP predikteras):")
+    for i, cls in enumerate(["NORM", "CD", "HYP", "MI", "STTC"]):
+        if i == 2:
+            continue  # Skip HYP själv
+        overlap = np.logical_and(hyp_pred, y_pred[:, i]).sum()
+        total_hyp_preds = hyp_pred.sum()
+        ratio = overlap / total_hyp_preds if total_hyp_preds > 0 else 0
+        print(f" - {cls}: {ratio:.2%}")
+
+    print("\nNär HYP är sann, hur ofta förutsägs den korrekt?")
+    recall_hyp = (hyp_pred & hyp_true).sum() / hyp_true.sum()
+    precision_hyp = (hyp_pred & hyp_true).sum() / hyp_pred.sum()
+    print(f"Precision HYP: {precision_hyp:.2%}")
+    print(f"Recall HYP: {recall_hyp:.2%}")
 
 parser = argparse.ArgumentParser(description='Evaluate Prediction by F1 score.')
 parser.add_argument('path_test_hdf5', type=str,
@@ -375,22 +392,7 @@ y_true_raw =  pd.read_csv(args.path_test_csv).values
 # get y_score (soft labels, probability)
 y_score_best = makePrediction(args.path_to_model, args.path_test_hdf5, "tracings")
 
-
-# %% Binarize the soft labels
-# Get threshold that yield the best precision recall using "get_optimal_precision_recall" on validation set
-#   (we rounded it up to three decimal cases to make it easier to read...)
-
-# This is the threshold for determining the binarization
-# threshold = np.array([0.124, 0.07, 0.05, 0.278, 0.390]) # Original valus from Riberio
-# threshold = np.array([0.49, 0.49, 0.49, 0.49, 0.49]) # Init values for getting opt values
-
-# Used model for testing PR vs FBT for thresholding
-# python evalPrediction.py data/PTB_XL_data/test_data.csv outputs dnn_predicts/base_model-BS32-LR0.001-DR_Keep_P0.5-DA_P0.5-L2_0.001-20250322-134701.npy
-# threshold = np.array([0.307, 0.436, 0.123, 0.123, 0.142]) # Threshold values from find_best_threshold
-# threshold = np.array([0.402, 0.436, 0.136, 0.189, 0.136]) # PR threshold from get_optimal_precision_recall, using test set and thresholding on 0.49.
-
 threshold =  find_best_threshold() # Dynamic threshold
-# threshold = [0.399,0.385,0.110,0.1645,0.26125] # Tog en average av 4 FBT thresholds.
 
 mask = y_score_best > threshold # This is a true/false matrix
 y_true = y_true_raw > threshold # This is a true/false matrix, works with the sklearn functions.
@@ -403,9 +405,11 @@ y_neuralnet = np.zeros_like(y_score_best)
 y_neuralnet[mask] = 1 # This converts true/false matrix into binary
 
 scores_list = []
+##############################
 
 #%% Usable functions
+# analyze_prediction_overlap(y_true, mask)
 Scores()
 PRCurve()
-ConfusionMatrix()
+# ConfusionMatrix()
 # Boxplot()

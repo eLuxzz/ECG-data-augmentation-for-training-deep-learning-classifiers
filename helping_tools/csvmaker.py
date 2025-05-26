@@ -1,9 +1,8 @@
 import pandas as pd
 import ast
 import csv
-import numpy as np
 
-df = pd.read_csv('data/PTB_XL_data/ptbxl_database.csv')
+df = pd.read_csv('data/PTB_XL_data/ptbxl_database.csv') #%% Path to ptbxl_database.csv
 train_data= []
 test_data= []
 val_data= [] 
@@ -65,8 +64,7 @@ for i in df['scp_codes']:
     max_val(common_with_hyp, "HYP", data_dict)
     max_val(common_with_mi, "MI", data_dict)
     max_val(common_with_sttc, "STTC", data_dict)
-    # Removed ecg_id temporarily from csv file.
-    #data_dict["id"] = df["ecg_id"][line]
+
     if not common:
         ides.append(int(df["ecg_id"][line]))
     else:
@@ -80,7 +78,7 @@ for i in df['scp_codes']:
     line += 1
     common = False
 
-# print(len(ides))
+print(len(ides))
 with open('data/PTB_XL_data/validation_data.csv', 'w', newline='') as csvfile:
     writer = csv.DictWriter(csvfile, fieldnames=SUPER_CLASSES)
     writer.writeheader()

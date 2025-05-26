@@ -39,12 +39,11 @@ class DataPlotter:
             axes[idx].plot(self.time, self.filtered_base[:, idx], label="Base Data", color="black")
             axes[idx].plot(self.time, self.filtered_augmented[:, idx], label="Augmented Data", linestyle="dashed", color="red")
             axes[idx].set_title(f"Lead {lead + 1}")
-            axes[idx].legend(loc='upper right')
-            axes[idx].set_ylabel("mV")
+            axes[idx].legend(loc='upper right', fontsize=12)
+            axes[idx].set_ylabel("mV", fontsize=14)
 
-        axes[-1].set_xlabel("Samples")
+        axes[-1].set_xlabel("Samples", fontsize=14)
         plt.suptitle("ECG Data (Base vs. Augmented)")
-        plt.tight_layout()
         plt.show()
 
     def _plot_separate_figures(self):
@@ -59,19 +58,19 @@ class DataPlotter:
         for idx, lead in enumerate(self.leads):
             axes1[idx].plot(self.time, self.filtered_base[:, idx], color="black")
             axes1[idx].set_title(f"Base Data - Lead {lead + 1}")
-            axes1[idx].set_ylabel("mV")
+            axes1[idx].set_ylabel("mV", fontsize=14)
             
             axes2[idx].plot(self.time, self.filtered_augmented[:, idx], color="red")
             axes2[idx].set_title(f"Augmented Data - Lead {lead + 1}")
-            axes2[idx].set_ylabel("mV")
+            axes2[idx].set_ylabel("mV", fontsize=14)
 
-        axes1[-1].set_xlabel("Samples")
-        axes2[-1].set_xlabel("Samples")
+        axes1[-1].set_xlabel("Samples", fontsize=14)
+        axes2[-1].set_xlabel("Samples", fontsize=14)
 
         fig1.suptitle("Base ECG Data")
         fig2.suptitle("Augmented ECG Data")
 
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.show()
 
     def plot(self):

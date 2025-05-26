@@ -1,10 +1,9 @@
 from fileloader import Fileloader
 from dataAugmenter import DataAugmenter
 import tensorflow as tf
-import tensorflow.keras.backend as K
 import numpy as np
 from imblearn.over_sampling import RandomOverSampler
-import gc
+
 class Dataloader():
     def __init__(self, pathHDF5_training, pathCSV_training, pathHDF5_valid, pathCSV_valid, 
                  setNameTraining = "tracings", setNameValid="tracings",
@@ -31,11 +30,12 @@ class Dataloader():
         
         self.batch_size = batch_size
         self.buffer_size = buffer_size
+        self.UseBalancedSet = useBalancedSet
         self.current_epoch = 0
         self.datasetLength = 0
+
         self.DA_P = tf.cast(DA_P, dtype=tf.float16)
         self.DA2_P = tf.cast(DA2_P, dtype=tf.float16)
-        self.UseBalancedSet = useBalancedSet
         self.n_classes = None
         self._DA = DataAugmenter()
         self.fileloader = Fileloader()
@@ -54,6 +54,7 @@ class Dataloader():
         
         self.n_classes = labels_training.shape[1]
         
+        #%% Different methods to get balanced indices
         balanced_idx = self.get_oversampled_indices(labels_training) if self.UseBalancedSet is True else None
         # balanced_idx = self.get_balanced_indices(labels_training) if self.UseBalancedSet is True else None
         
@@ -73,10 +74,10 @@ class Dataloader():
                 new_samples.append(c)
             print(f"Total: {new_samples}")
 
-        chunk_size = n_balancedIdx // 5
         print(n_balancedIdx)
         def dataset_generator():
             if sliceIdx:
+                print("Using sliced dataset")
                 for i in range(n_balancedIdx if sliceIdx is None else sliceIdx):
                     yield signal_training[i], labels_training[i]
             else:
@@ -91,7 +92,6 @@ class Dataloader():
                 else:
                     print("Using balanced dataset")
                     i = 0
-                    end_idx = min(i + chunk_size, n_balancedIdx)
                     while True:
                         idx = balanced_idx[i]
                         yield signal_training[idx], labels_training[idx]
@@ -99,13 +99,10 @@ class Dataloader():
                         if i >= n_balancedIdx:
                             i = 0 
                         
-              
         # Wrap the generator in tf.data.Dataset
         dataset = tf.data.Dataset.from_generator(
             dataset_generator,
             output_signature=(
-                # tf.TensorSpec(shape=(5000, 12), dtype=tf.float16),
-                # tf.TensorSpec(shape=(5), dtype=tf.float16)
                 tf.TensorSpec(shape=(5000, 12), dtype=tf.float32),
                 tf.TensorSpec(shape=(5), dtype=tf.float32)
                 )
@@ -120,13 +117,8 @@ class Dataloader():
     
     def get_balanced_indices(self, labels, confidence_threshold=0.8, other_threshold=0.35):
         y_classes = np.argmax(labels, axis=1)
-
-        # ---- 1. Downsample NORM (class 0) ----
-        norm_indices = np.where(y_classes == 0)[0]
-        np.random.shuffle(norm_indices)
-        norm_indices = norm_indices[:5000]
-
-        # ---- 2. Confident HYP Samples (class 2) ----
+        
+        # ---- 1. Confident HYP Samples (class 2) ----
         hyp_mask = (labels[:, 2] >= confidence_threshold) & \
                 (labels[:, [0,1,3,4]] <= other_threshold).all(axis=1)
         confident_hyp_indices = np.where(hyp_mask)[0]
@@ -137,6 +129,7 @@ class Dataloader():
 
         if current_hyp < target_hyp:
             ros = RandomOverSampler(sampling_strategy={2: target_hyp})
+            norm_indices = np.where(y_classes == 0)[0]
             dummy_indices = norm_indices[:1]
             dummy_labels = np.full(len(dummy_indices), 0)
             
@@ -151,21 +144,10 @@ class Dataloader():
             np.random.shuffle(confident_hyp_indices)
             hyp_indices_final = confident_hyp_indices[:target_hyp]
         
-        # ---- 3. Include all other classes as-is ----
-        cd_indices  = np.where(y_classes == 1)[0]
-        hyp_indices  = np.where(y_classes == 2)[0]
-        mi_indices  = np.where(y_classes == 3)[0]
-        sttc_indices = np.where(y_classes == 4)[0]
-
+        # ---- 2. Include all other classes as-is ----
         final_indices = np.concatenate([
             np.arange(len(labels)),
             hyp_indices_final
-            # norm_indices,
-            # cd_indices,
-            # mi_indices,
-            # sttc_indices,
-            # hyp_indices,
-            # hyp_indices_final
         ])
         np.random.shuffle(final_indices)
         return final_indices
@@ -248,8 +230,6 @@ class Dataloader():
             .prefetch(tf.data.AUTOTUNE)
         
         print("Base epoch loaded and DA Compiled")
-        # for sample in dataset.take(1):
-        #     print(f"DA: Shape after da: {sample[0].shape}, {sample[1].shape}")   
         # final_dataset = base_epoch.concatenate(dataset)
         return dataset
     

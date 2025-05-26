@@ -1,10 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-import numpy as np
 import warnings
 import argparse
-warnings.filterwarnings("ignore")
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 from datasets import ECGSequence
@@ -14,7 +11,7 @@ def makePrediction(modelPath, testSignalHdf5, datasetName):
      # Import data
     fileloader = Fileloader()
     signaldata, _ = fileloader.getData(testSignalHdf5, datasetName)
-    seq = ECGSequence(signaldata, batch_size=32)
+    seq = ECGSequence(signaldata, batch_size=32) #% Not updated to use dataloader
     
     # Import model
     model = load_model(modelPath, compile=False)
@@ -41,9 +38,9 @@ if __name__ == '__main__':
 
     y_score = makePrediction(args.path_to_model, args.path_to_hdf5, args.dataset_name)
     
-    fileName = args.path_to_model.split("/")[-1]
-    output_path = os.path.join(args.output_folder, f"{str.removesuffix(fileName, ".keras")}")
-
-    np.save(output_path, y_score)
+    #%% Use this if you want to save the predictions as a npy file.
+    # fileName = args.path_to_model.split("/")[-1]
+    # output_path = os.path.join(args.output_folder, f"{str.removesuffix(fileName, ".keras")}")
+    # np.save(output_path, y_score)
 
     print("Output predictions saved")

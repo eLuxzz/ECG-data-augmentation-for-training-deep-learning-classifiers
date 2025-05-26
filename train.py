@@ -1,5 +1,5 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' #% Suppress info messsages
 
 from tensorflow.keras import mixed_precision
 mixed_precision.set_global_policy('mixed_float16')
@@ -7,17 +7,28 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import (ModelCheckpoint, TensorBoard, ReduceLROnPlateau,
                                         EarlyStopping)
 from tensorflow.keras.metrics import AUC
-from sklearn.utils.class_weight import compute_class_weight
-import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import argparse
 import time
-from CustomCallbacks import UpdateDA
-# from CustomMetrics import f1_score_metrics
+from tensorflow.keras.losses import BinaryFocalCrossentropy
+from customCallbacks import UpdateDA
 
 from model import get_model
 from dataloader import Dataloader
+
+def focal_loss_softlabels(alpha=0.25, gamma=2.0):
+    def loss(y_true, y_pred):
+        # Avoid numerical instability
+        y_pred = tf.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
+
+        # Positive and negative focal modulations
+        pos_term = -alpha * tf.pow(1.0 - y_pred, gamma) * y_true * tf.math.log(y_pred)
+        neg_term = -(1 - alpha) * tf.pow(y_pred, gamma) * (1.0 - y_true) * tf.math.log(1.0 - y_pred)
+
+        # Combine both terms
+        return tf.reduce_mean(pos_term + neg_term)
+    return loss
 
 
 physical_devices = tf.config.list_physical_devices('GPU')
@@ -54,7 +65,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Optimization settings
-    lr = 0.002
+    lr = 0.001
     batch_size = args.BS
     
     # Load data and setup sequences
@@ -80,13 +91,15 @@ if __name__ == "__main__":
     print(f"L2: {l2_lambda}")
     print(f"Balanced: {useBalancedSet}")
     tf_dataset = dataloader.getTrainingData(DA_methods,sliceIdx=slice)
+    alpha = [0.25, 0.25, 0.6, 0.25, 0.25]
 
-    loss = 'binary_crossentropy'
+    #%% Different loss functions, paper was evaluated on binary_crossentropy.
+    loss = 'binary_crossentropy' 
+    # loss = focal_loss_softlabels(gamma=2, alpha = 0.75)
+    # loss = BinaryFocalCrossentropy(gamma=2, alpha=alpha)
     opt = Adam(lr)
     metrics = [AUC(multi_label=True, name ="AUC"),
-                AUC(multi_label=True, curve="PR", name="pr_auc")
-                # ,f1_score_metrics # Får inte den att funka än, tanken är att byta ut EarlyStopping monitor till F1
-                ]
+                AUC(multi_label=True, curve="PR", name="pr_auc")]
     
     # If you are continuing an interrupted section, uncomment line bellow:
     # PATH_TO_PREV_MODEL = "backup_model_last.keras"
@@ -109,7 +122,7 @@ if __name__ == "__main__":
                 UpdateDA(dataloader)]
     if useEarlyStopping:
         callbacks += [
-                    EarlyStopping(monitor="val_loss", # Tanken är att byta ut denna mot F1_Score
+                    EarlyStopping(monitor="val_loss", 
                                 patience=8,  # Patience should be larger than the one in ReduceLROnPlateau
                                 min_delta=0.00001,
                                 restore_best_weights = True, 
@@ -122,25 +135,11 @@ if __name__ == "__main__":
     # Train neural network
     print("Start training")
     # steps_per_epoch = (slice) // batch_size # Use this when testing with slice.
-    # steps_per_epoch = len(trainAnnotationData) // batch_size
     steps_per_epoch = dataloader.datasetLength // batch_size
-    # dir_newmodels = os.path.relpath("new_models")
-    # os.makedirs(dir_newmodels, exist_ok=True)
-    # dir_newmodels = os.path.join(dir_newmodels, f"{fileName}")
+    
     def training():
-        # Compute class weights
-        # _, trainAnnotationData = dataloader.fileloader.getData(dataloader.PathHDF5_training, dataloader.SetName_Training, dataloader.PathCSV_training)
-        # class_weights = compute_class_weight(class_weight="balanced",
-        #                                     classes=np.unique(trainAnnotationData.argmax(axis=1)),
-        #                                     y=trainAnnotationData.argmax(axis=1))
-
-        # #Convert to dictionary format
-        # class_weights_dict = {i: class_weights[i] for i in range(len(class_weights))}
-        # print(class_weights_dict)
-        
         history = model.fit(tf_dataset,
                             epochs=num_epochs,
-                            # class_weight = class_weights_dict,
                             initial_epoch=0,  # If you are continuing a interrupted section change here
                             callbacks=callbacks,
                             validation_data=validation_dataset,
@@ -152,4 +151,3 @@ if __name__ == "__main__":
     training()
     K.clear_session()
     print(f"Training finished, saved as {fileName}")
-    # tf.profiler.experimental.stop()

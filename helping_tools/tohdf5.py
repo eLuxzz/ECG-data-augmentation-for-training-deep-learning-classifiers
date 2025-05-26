@@ -1,12 +1,10 @@
 import wfdb
 import h5py
 import numpy as np
-import os
 from tqdm import tqdm
 
 # Paths
-
-records_start_path = "/mnt/d/Studierelaterat/KEX-Lokalt/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/"
+records_start_path = "/path/to/records/"  # Adjust this path to your records directory
 path_record_train = "data/PTB_XL_data/RECORDS_TRAIN.txt"  # Path to the record list
 path_record_test = "data/PTB_XL_data/RECORDS_TEST.txt"
 path_record_valid = "data/PTB_XL_data/RECORDS_VALID.txt"
@@ -36,15 +34,7 @@ def CreateHDF5(recordsPath, outputPath):
                 # Read the ECG record
                 record = wfdb.rdrecord(records_start_path+path)  # WFDB will find .dat and .hea automatically
                 signals = record.p_signal  # Shape (5000, 12)
-                # Store in HDF5 file
-                
-                # Adds id as a column
-                # id = path.split("/")[2].replace("_hr", "")
-                # id_col = np.zeros((5000,1))
-                # id_col[0] = id
-                # new_col = np.hstack((id_col, signals))
-                
-                
+                # Store in HDF5 file                
                 dataset[i] =  signals
             except Exception as e:
                print(f"Error processing {records_start_path+path}: {e}")

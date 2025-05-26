@@ -131,16 +131,12 @@ dmypy.json
 
 # Avoid large files
 *.hdf5
-
-# Added ignores // Kent
 *.keras
 .npy
 *.npy
 test.py
 /logs
 /trained_models
-/dnn_predicts/other_seeds
-/dnn_predicts/other_splits
-/dnn_predicts
+/trained_models_balanced
 /outputs_old
 /outputs
