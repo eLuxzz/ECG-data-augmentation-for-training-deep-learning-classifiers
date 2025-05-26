@@ -98,7 +98,7 @@ $ python to_hdf5.py
 The necessary pre-processing should be done.
 
 ## Acknowledgements
-This repository's residual model is based on the model described in the article [Automatic diagnosis of the 12-lead ECG using a deep neural network](https://doi.org/10.1038/s41467-020-15432-4). The model and predict code is based on the repo belonging to the article[Automatic ECG diagnosis using a deep neural network](https://github.com/antonior92/automatic-ecg-diagnosis), and modified to suit the new usecase.
+This repository's residual model is based on the model described in the article [Automatic diagnosis of the 12-lead ECG using a deep neural network](https://doi.org/10.1038/s41467-020-15432-4). The model and predict code is based on the repo belonging to the article [Automatic ECG diagnosis using a deep neural network](https://github.com/antonior92/automatic-ecg-diagnosis), and modified to suit the new usecase.
 
 The original repository is licensed under the [MIT License](https://opensource.org/licenses/MIT), which permits modification and redistribution.
 
